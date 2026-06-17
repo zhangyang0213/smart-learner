@@ -1,13 +1,14 @@
 // ============ Schedule ============
 export interface ScheduleItem {
-  id: string;
-  title: string;
-  day: number;
-  start_time: string;
-  end_time: string;
-  location: string;
+  course_name: string;
+  course_code: string;
   teacher: string;
-  color?: string;
+  location: string;
+  start_section: number;
+  end_section: number;
+  day_of_week: number; // 1=Monday, 7=Sunday
+  weeks: number[];
+  weeks_str: string;
 }
 
 // ============ Course ============

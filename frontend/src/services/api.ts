@@ -176,25 +176,24 @@ async function streamFormChat(
 
 // ============ Auth ============
 export const auth = {
-  casLogin: async (): Promise<string | null> => {
-    try {
-      const res = await fetch(`${BASE_URL}/api/auth/cas/login`);
-      const data = await res.json();
-      return data.login_url || null;
-    } catch {
-      return null;
-    }
+  register: (studentId: string, name: string, college: string, major: string, grade: string) =>
+    formRequest<ApiResponse<{ user: UserProfile }>>('/api/auth/register', {
+      student_id: studentId,
+      name,
+      college,
+      major,
+      grade,
+    }),
+
+  uploadSchedule: (userId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('user_id', userId);
+    return uploadRequest<ApiResponse<{ message: string }>>('/api/auth/upload-schedule', formData);
   },
 
-  casCallback: (ticket: string) =>
-    request<ApiResponse<{ user: UserProfile; token: string }>>(
-      `/api/auth/cas/callback?ticket=${encodeURIComponent(ticket)}`
-    ),
-
-  getSchedule: (userId: string) =>
-    queryRequest<ApiResponse<ScheduleItem[]>>(
-      `/api/auth/schedule/${encodeURIComponent(userId)}`
-    ),
+  getSchedule: (userId: string, week?: number) =>
+    request<ApiResponse<ScheduleItem[]>>(`/api/auth/schedule/${encodeURIComponent(userId)}${week ? `?week=${week}` : ''}`),
 
   getProfile: (userId: string) =>
     request<ApiResponse<UserProfile>>(`/api/auth/profile/${encodeURIComponent(userId)}`),

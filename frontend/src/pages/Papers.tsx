@@ -213,12 +213,12 @@ export default function Papers() {
             ) : (
               <>
                 <Upload className="w-10 h-10 text-warm-400 mx-auto mb-3" />
-                <p className="text-warm-700 font-medium mb-1">拖拽 PDF 文件到此处上传</p>
-                <p className="text-warm-400 text-sm mb-4">或点击下方按钮选择文件</p>
+                <p className="text-warm-700 font-medium mb-1">拖拽论文文件到此处上传</p>
+                <p className="text-warm-400 text-sm mb-4">支持 PDF、Word、TXT 格式</p>
                 <label className="btn-primary cursor-pointer inline-flex items-center gap-2">
                   <FileText className="w-4 h-4" />
-                  选择 PDF 文件
-                  <input type="file" accept=".pdf" className="hidden" onChange={handleFileInput} />
+                  选择论文文件
+                  <input type="file" accept=".pdf,.docx,.doc,.txt,.md" className="hidden" onChange={handleFileInput} />
                 </label>
               </>
             )}
