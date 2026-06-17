@@ -202,7 +202,7 @@ function Layout() {
             <Route path="/teams" element={<Teams />} />
             <Route path="/lesson" element={<Lesson />} />
             <Route path="/schedule" element={<Schedule />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/lesson" replace />} />
           </Routes>
         </div>
       </main>

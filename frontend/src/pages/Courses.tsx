@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Plus, Star, X, User, Calendar } from 'lucide-react';
 import { course } from '@/services/api';
+import { useAppStore } from '@/store';
 import type { Course } from '@/types';
 
 const mockCourses: Course[] = [
@@ -48,6 +49,8 @@ const courseColors = [
 
 export default function Courses() {
   const navigate = useNavigate();
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
   const [courses, setCourses] = useState<Course[]>(mockCourses);
   const [favorites, setFavorites] = useState<Set<string>>(new Set(['1', '3']));
   const [showModal, setShowModal] = useState(false);
@@ -58,7 +61,7 @@ export default function Courses() {
   useEffect(() => {
     async function fetchCourses() {
       try {
-        const res = await course.listCourses();
+        const res = await course.listCourses(userId);
         if (res.success) setCourses(res.data);
       } catch {
         // Use mock data
@@ -66,7 +69,7 @@ export default function Courses() {
       setLoading(false);
     }
     fetchCourses();
-  }, []);
+  }, [userId]);
 
   const toggleFavorite = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -82,7 +85,7 @@ export default function Courses() {
     if (!form.name || !form.code || !form.teacher) return;
     setSubmitting(true);
     try {
-      const res = await course.addCourse(form);
+      const res = await course.addCourse({ ...form, user_id: userId });
       if (res.success) {
         setCourses((prev) => [...prev, res.data]);
         setShowModal(false);

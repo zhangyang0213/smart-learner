@@ -15,6 +15,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { paper } from '@/services/api';
+import { useAppStore } from '@/store';
 import ChatDialog from '@/components/ChatDialog';
 import type { PaperAnalysis, ChatMessage } from '@/types';
 
@@ -49,6 +50,8 @@ const mockAnalysis: PaperAnalysis = {
 type TabKey = 'analysis' | 'qa' | 'related';
 
 export default function Papers() {
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
   const [analysis, setAnalysis] = useState<PaperAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('analysis');
   const [uploading, setUploading] = useState(false);
@@ -69,7 +72,7 @@ export default function Papers() {
     if (!file.name.endsWith('.pdf')) return;
     setUploading(true);
     try {
-      const res = await paper.analyzePaper(file);
+      const res = await paper.analyzePaper(file, userId);
       if (res.success) {
         setAnalysis(res.data);
         // Auto-estimate difficulty
@@ -114,7 +117,7 @@ export default function Papers() {
     try {
       const blob = new Blob([pastedText], { type: 'text/plain' });
       const file = new File([blob], 'pasted-text.txt', { type: 'text/plain' });
-      const res = await paper.analyzePaper(file);
+      const res = await paper.analyzePaper(file, userId);
       if (res.success) {
         setAnalysis(res.data);
         setDifficulty(Math.floor(Math.random() * 3) + 2);
@@ -139,7 +142,7 @@ export default function Papers() {
     setQaMessages((prev) => [...prev, userMsg]);
     setQaLoading(true);
     try {
-      const res = await paper.paperQA(analysis.id, question);
+      const res = await paper.paperQA(analysis.id, question, userId);
       if (res.success) {
         setQaMessages((prev) => [...prev, res.data]);
       }
@@ -160,7 +163,7 @@ export default function Papers() {
     if (!analysis) return;
     setRelatedLoading(true);
     try {
-      const res = await paper.suggestRelated(analysis.id);
+      const res = await paper.suggestRelated(analysis.id, userId);
       if (res.success) setRelatedPapers(res.data);
     } catch {
       setRelatedPapers([]);

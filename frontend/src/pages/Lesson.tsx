@@ -1,127 +1,122 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Plus,
-  Lightbulb,
-  Search,
+  Upload,
   BookOpen,
-  Microscope,
-  Zap,
-  CheckCircle2,
   MessageSquare,
-  ChevronRight,
-  ChevronLeft,
+  FileText,
+  Brain,
+  Send,
   Loader2,
-  BookMarked,
-  GraduationCap,
-  Target,
-  Briefcase,
-  Edit3,
-  X,
-  Award,
-  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
   ChevronDown,
   ChevronUp,
-  Send,
+  Lightbulb,
+  Target,
+  Microscope,
+  Zap,
+  Award,
+  GraduationCap,
+  X,
+  File,
+  AlertCircle,
+  BookMarked,
+  ArrowRight,
+  BarChart3,
+  Clock,
+  MessageCircle,
 } from 'lucide-react';
 import { lesson } from '@/services/api';
+import { useAppStore } from '@/store';
 import type {
-  LessonCourseItem,
   LessonOutline,
   LessonContent,
   LessonSection,
-  MasteryEvaluation,
   ExamQuestion,
-  ExamRecord,
-  LearnerProfile,
+  MasteryEvaluation,
 } from '@/types';
 
+// ============ Types ============
+interface ChatMsg {
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: { title: string; score: number }[];
+}
+
+interface FileRecord {
+  name: string;
+  size: number;
+  status: string;
+  chars?: number;
+  error?: string;
+}
+
 // ============ Mock Data ============
-const mockCourses: LessonCourseItem[] = [
-  {
-    id: 1,
-    course_name: '机器学习基础',
-    outline: {
-      course_name: '机器学习基础',
-      units: [
-        { name: '什么是机器学习', difficulty: '入门', knowledge_points: ['定义', '分类', '应用场景'], prerequisites: [], order: 0, source: '教材第一章' },
-        { name: '线性回归', difficulty: '入门', knowledge_points: ['假设函数', '损失函数', '梯度下降'], prerequisites: ['什么是机器学习'], order: 1, source: '教材第二章' },
-        { name: '逻辑回归', difficulty: '进阶', knowledge_points: ['Sigmoid函数', '决策边界', '多分类'], prerequisites: ['线性回归'], order: 2, source: '教材第三章' },
-        { name: '决策树与随机森林', difficulty: '进阶', knowledge_points: ['信息增益', '剪枝', '集成学习'], prerequisites: ['逻辑回归'], order: 3, source: '教材第四章' },
-        { name: '神经网络基础', difficulty: '高级', knowledge_points: ['感知机', '反向传播', '激活函数'], prerequisites: ['线性回归', '逻辑回归'], order: 4, source: '教材第五章' },
-      ],
-    },
-    status: '进行中',
-    created_at: '2026-06-01T00:00:00Z',
-  },
-  {
-    id: 2,
-    course_name: '操作系统原理',
-    outline: {
-      course_name: '操作系统原理',
-      units: [
-        { name: '操作系统概述', difficulty: '入门', knowledge_points: ['定义', '功能', '发展历史'], prerequisites: [], order: 0, source: '教材第一章' },
-        { name: '进程管理', difficulty: '进阶', knowledge_points: ['进程状态', '调度算法', '进程同步'], prerequisites: ['操作系统概述'], order: 1, source: '教材第二章' },
-        { name: '内存管理', difficulty: '高级', knowledge_points: ['分页', '分段', '虚拟内存'], prerequisites: ['进程管理'], order: 2, source: '教材第三章' },
-      ],
-    },
-    status: '进行中',
-    created_at: '2026-06-10T00:00:00Z',
-  },
-];
+const mockOutline: LessonOutline = {
+  course_name: '数据结构与算法',
+  units: [
+    { name: '算法基础与复杂度分析', difficulty: '入门', knowledge_points: ['时间复杂度', '空间复杂度', '大O表示法', '最好/最坏/平均情况'], prerequisites: [], order: 0, source: '教材第一章' },
+    { name: '线性表：数组与链表', difficulty: '入门', knowledge_points: ['顺序存储', '链式存储', '插入删除', '遍历查找'], prerequisites: ['算法基础与复杂度分析'], order: 1, source: '教材第二章' },
+    { name: '栈与队列', difficulty: '进阶', knowledge_points: ['LIFO/FIFO', '递归与栈', '双端队列', '应用场景'], prerequisites: ['线性表：数组与链表'], order: 2, source: '教材第三章' },
+    { name: '树与二叉树', difficulty: '进阶', knowledge_points: ['二叉树遍历', 'BST', 'AVL树', '堆'], prerequisites: ['栈与队列'], order: 3, source: '教材第四章' },
+    { name: '图论基础', difficulty: '高级', knowledge_points: ['BFS/DFS', '最短路径', '最小生成树', '拓扑排序'], prerequisites: ['树与二叉树'], order: 4, source: '教材第五章' },
+  ],
+};
 
 const mockLessonContent: LessonContent = {
-  title: '什么是机器学习',
-  objectives: ['理解机器学习的基本定义', '区分监督学习与无监督学习', '了解机器学习的典型应用场景'],
-  knowledge_points: ['定义', '分类', '应用场景'],
+  title: '算法基础与复杂度分析',
+  objectives: ['理解算法的定义与特性', '掌握大O表示法', '能分析常见算法的时间复杂度', '区分最好、最坏和平均情况'],
+  knowledge_points: ['时间复杂度', '空间复杂度', '大O表示法', '最好/最坏/平均情况'],
   sections: [
-    { type: 'life_intro', title: '生活小现象引入', content: '你有没有想过，为什么购物网站总能推荐你感兴趣的商品？为什么邮箱能自动识别垃圾邮件？这些"聪明"的行为背后，都是机器学习在发挥作用。就像你从小通过看猫的照片学会了认猫一样，计算机也能通过大量数据"学会"识别模式。' },
-    { type: 'logic', title: '现象背后的逻辑', content: '这些应用的核心逻辑是：从数据中学习规律，再用规律去预测未知。传统编程是"人写规则，机器执行"，而机器学习是"机器从数据中自己发现规则"。这种范式转换，正是AI革命的本质。' },
-    { type: 'course_content', title: '课程核心内容', content: '机器学习是人工智能的一个子领域，它使计算机系统能够从数据中学习和改进，而无需显式编程。根据学习方式的不同，主要分为：监督学习（有标签数据训练）、无监督学习（无标签数据发现结构）、强化学习（通过奖惩信号学习策略）。' },
-    { type: 'formal', title: '正式解释', content: 'Mitchell的定义：一个计算机程序从经验E中学习，针对某类任务T和性能度量P，如果在任务T上以P衡量的性能随着经验E的增加而提高，则称该程序对任务T进行了学习。形式化表示为：∃f: X→Y，学习算法从训练集D={(x_i, y_i)}中近似f。' },
-    { type: 'deep_dive', title: '深挖理解', content: '机器学习的理论基础涉及统计学习理论，核心问题是泛化能力——模型在未见数据上的表现。偏差-方差权衡是理解模型性能的关键：偏差过高导致欠拟合，方差过高导致过拟合。正则化、交叉验证等技术都是为了解决这一核心矛盾。' },
-    { type: 'application', title: '实际应用', content: '1. 推荐系统：Netflix、淘宝的商品推荐\n2. 自然语言处理：机器翻译、智能客服\n3. 计算机视觉：人脸识别、自动驾驶\n4. 医疗健康：疾病预测、药物发现\n5. 金融风控：信用评分、欺诈检测' },
+    { type: 'life_intro', title: '生活引入', content: '想象你在图书馆找一本书。你可以一本一本地翻（线性查找），也可以先看分类标签再定位（二分查找）。两种方法都能找到书，但速度天差地别。算法就是解决问题的"方法"，而复杂度分析就是衡量方法"快不快"的尺子。' },
+    { type: 'course_content', title: '正式讲解', content: '算法是解决特定问题的一系列有限步骤。时间复杂度用大O表示法描述：O(1)常数时间、O(log n)对数时间、O(n)线性时间、O(n log n)线性对数时间、O(n²)平方时间。空间复杂度衡量算法运行过程中所需的额外内存空间。' },
+    { type: 'deep_dive', title: '深挖理解', content: '大O表示法关注的是增长趋势，忽略常数因子和低阶项。例如 3n² + 2n + 1 = O(n²)。最好情况（Best Case）是算法在最有利输入下的表现，最坏情况（Worst Case）是最不利输入下的表现，平均情况（Average Case）是所有可能输入的期望表现。' },
+    { type: 'application', title: '实际应用', content: '1. 排序算法选择：小数据用插入排序O(n²)，大数据用归并排序O(n log n)\n2. 数据库索引：B+树索引使查询从O(n)降到O(log n)\n3. 哈希表查找：平均O(1)，最坏O(n)\n4. 图的遍历：BFS/DFS都是O(V+E)' },
   ],
   quick_check: [
-    { question: '机器学习和传统编程的最大区别是什么？', answer_hint: '想想"谁在制定规则"——是人还是机器？' },
-    { question: '监督学习和无监督学习的核心区别是什么？', answer_hint: '关键在于训练数据是否有"标签"。' },
+    { question: 'O(n²)和O(n log n)哪个增长更快？', answer_hint: '当n足够大时，n²远大于n log n，所以O(n²)增长更快。' },
+    { question: '二分查找的时间复杂度是多少？为什么？', answer_hint: 'O(log n)，因为每次比较都将搜索范围缩小一半。' },
   ],
   feedback_entry: { can_retell: '', stuck_at: '', difficulty: 3, next_step: 'continue' },
 };
 
-const mockProfile: LearnerProfile = {
-  id: 1,
-  user_id: 1,
-  goals: { main_goal: '掌握机器学习核心算法', target_task: '完成课程项目', application_scene: '数据分析与AI应用开发' },
-  background: { mastered: 'Python基础、线性代数', familiar: '概率统计、数据结构', unfamiliar: '深度学习框架', experience: '有1年Python编程经验，做过简单数据分析项目' },
-  preferences: { explanation_style: '从直觉到公式，循序渐进', dislike_style: '纯数学推导没有直觉解释', example_scene: '日常生活中的类比', practice_form: '编程实践' },
-  knowledge_transfer: [
-    { new_field: '梯度下降', analogy: '像蒙眼下山，每一步都往最陡的方向走', method: '直觉类比→几何解释→数学推导', scene: '山地导航', boundary: '非凸函数可能陷入局部最优' },
-  ],
-};
-
-const mockExamQuestions: ExamQuestion[] = [
-  { type: 'single_choice', knowledge_point: '机器学习定义', question: '以下哪个最准确地描述了机器学习？', options: ['让计算机执行预设规则', '从数据中自动学习规律并做出预测', '人工编写所有判断逻辑', '只靠硬件加速计算'], answer: 'B', explanation: '机器学习的核心是从数据中自动学习规律，而非人工编写规则。', source: '教材第一章' },
-  { type: 'multi_choice', knowledge_point: '学习分类', question: '以下哪些属于监督学习的应用？', options: ['垃圾邮件分类', '客户分群', '房价预测', '图像聚类'], answer: 'A,C', explanation: '垃圾邮件分类和房价预测需要标签数据，属于监督学习；客户分群和图像聚类不需要标签，属于无监督学习。', source: '教材第一章' },
-  { type: 'concept', knowledge_point: '泛化能力', question: '请用自己的话解释什么是"泛化能力"，为什么它对机器学习模型很重要？', answer: '泛化能力指模型对未见数据的预测能力。', explanation: '泛化能力是模型的核心评价指标，一个只在训练集上表现好的模型没有实用价值。', source: '教材第一章' },
-  { type: 'case_study', knowledge_point: '应用场景', question: '某银行希望建立一个自动审批贷款的系统。请分析：应该使用什么类型的学习方法？需要什么样的数据？可能面临什么挑战？', answer: '应使用监督学习，需要历史贷款数据（含是否违约标签），挑战包括数据偏差、隐私保护等。', explanation: '贷款审批是典型的分类问题，需要历史标签数据。实际中需注意公平性和可解释性。', source: '教材第一章' },
+const mockQuizQuestions: ExamQuestion[] = [
+  { type: 'single_choice', knowledge_point: '时间复杂度', question: '以下哪个时间复杂度最优？', options: ['O(n²)', 'O(n log n)', 'O(n)', 'O(log n)'], answer: 'D', explanation: 'O(log n)增长最慢，性能最优。', source: '教材第一章' },
+  { type: 'single_choice', knowledge_point: '大O表示法', question: '3n² + 2n + 1 的大O表示是？', options: ['O(3n²)', 'O(n² + n)', 'O(n²)', 'O(6n²)'], answer: 'C', explanation: '大O表示法忽略常数系数和低阶项，3n² + 2n + 1 = O(n²)。', source: '教材第一章' },
+  { type: 'single_choice', knowledge_point: '空间复杂度', question: '以下哪种操作通常需要O(n)的额外空间？', options: ['原地冒泡排序', '归并排序', '二分查找', '快速排序（原地）'], answer: 'B', explanation: '归并排序需要O(n)的辅助数组来合并子数组。', source: '教材第一章' },
+  { type: 'multi_choice', knowledge_point: '复杂度分析', question: '以下哪些算法的平均时间复杂度为O(n log n)？', options: ['快速排序', '归并排序', '冒泡排序', '堆排序'], answer: 'A,B,D', explanation: '快速排序平均O(n log n)，归并排序始终O(n log n)，堆排序O(n log n)，冒泡排序O(n²)。', source: '教材第一章' },
+  { type: 'single_choice', knowledge_point: '最好/最坏情况', question: '线性查找在数组中查找元素，最好情况的时间复杂度是？', options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'], answer: 'A', explanation: '最好情况是第一个元素就是目标，只需一次比较，O(1)。', source: '教材第一章' },
 ];
 
-const mockMastery: MasteryEvaluation = {
-  mastery_level: '能听懂',
-  analysis: '学习者对基本概念有初步理解，但尚不能独立复述核心定义，需要更多练习和巩固。',
-  next_action: 'add_practice',
-  need_reinforce: true,
-};
+const mockRawText = `=== 第1页 ===
+数据结构与算法
+第一章：算法基础
+
+=== 第2页 ===
+1.1 算法的定义
+算法是解决特定问题的一系列有限步骤
+
+=== 第3页 ===
+1.2 时间复杂度
+大O表示法：O(1), O(log n), O(n), O(n log n), O(n²)
+
+=== 第4页 ===
+1.3 空间复杂度
+衡量算法运行过程中所需的额外内存空间
+
+=== 第5页 ===
+1.4 最好/最坏/平均情况
+Best Case / Worst Case / Average Case`;
 
 // ============ Difficulty Badge ============
-function DifficultyBadge({ difficulty }: { difficulty: '入门' | '进阶' | '高级' }) {
-  const colors = {
+function DifficultyBadge({ difficulty }: { difficulty: string }) {
+  const colors: Record<string, string> = {
     '入门': 'bg-emerald-100 text-emerald-700',
     '进阶': 'bg-amber-100 text-amber-700',
     '高级': 'bg-red-100 text-red-700',
   };
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[difficulty]}`}>
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[difficulty] || 'bg-warm-100 text-warm-600'}`}>
       {difficulty}
     </span>
   );
@@ -137,7 +132,7 @@ function MasteryBar({ level }: { level: string }) {
     <div className="w-full">
       <div className="flex justify-between text-xs text-warm-400 mb-1">
         <span>掌握度</span>
-        <span className="font-medium text-warm-600">{level}</span>
+        <span className="font-medium text-warm-600">{level || '未接触'}</span>
       </div>
       <div className="w-full h-2 bg-warm-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
@@ -150,7 +145,7 @@ function MasteryBar({ level }: { level: string }) {
 function SectionIcon({ type }: { type: LessonSection['type'] }) {
   const iconMap: Record<string, React.ReactNode> = {
     life_intro: <Lightbulb size={20} className="text-amber-500" />,
-    logic: <Search size={20} className="text-blue-500" />,
+    logic: <Zap size={20} className="text-blue-500" />,
     course_content: <BookOpen size={20} className="text-navy-600" />,
     formal: <BookMarked size={20} className="text-purple-500" />,
     deep_dive: <Microscope size={20} className="text-indigo-500" />,
@@ -162,347 +157,630 @@ function SectionIcon({ type }: { type: LessonSection['type'] }) {
 }
 
 // ============ Main Component ============
-type ViewMode = 'list' | 'create' | 'lesson' | 'exam';
+type Step = 'upload' | 'learning';
+type Tab = 'chat' | 'content' | 'quiz' | 'raw';
 
 export default function Lesson() {
-  // Course state
-  const [courses, setCourses] = useState<LessonCourseItem[]>(mockCourses);
-  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
-  const [selectedUnitIndex, setSelectedUnitIndex] = useState<number | null>(null);
+  const user = useAppStore((s) => s.user);
+  const userId = Number(user?.user_id) || 1;
 
-  // View state
-  const [view, setView] = useState<ViewMode>('list');
+  // Step state
+  const [step, setStep] = useState<Step>('upload');
 
-  // Course creation
+  // Upload state
   const [courseName, setCourseName] = useState('');
-  const [materials, setMaterials] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
-  // Lesson content
+  // Course state
+  const [outline, setOutline] = useState<LessonOutline | null>(null);
+  const [lessonCourseId, setLessonCourseId] = useState<number | null>(null);
+  const [currentUnitIndex, setCurrentUnitIndex] = useState(0);
+  const [rawTexts, setRawTexts] = useState<string[]>([]);
+  const [selectedRawFile, setSelectedRawFile] = useState(0);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<Tab>('chat');
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([
+    { role: 'assistant', content: '你好！我已经学习了你的课件内容，有什么问题尽管问我吧！' },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatStreaming, setChatStreaming] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Lesson content state
   const [lessonContent, setLessonContent] = useState<LessonContent | null>(null);
   const [lessonLoading, setLessonLoading] = useState(false);
+  const [expandedChecks, setExpandedChecks] = useState<Set<number>>(new Set());
 
-  // Mastery
+  // Quiz state
+  const [quizQuestions, setQuizQuestions] = useState<ExamQuestion[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizLoading, setQuizLoading] = useState(false);
+
+  // Mastery state
   const [mastery, setMastery] = useState<MasteryEvaluation | null>(null);
-
-  // Feedback form
   const [feedbackForm, setFeedbackForm] = useState({
     can_retell: '',
     stuck_at: '',
     difficulty: 3,
-    next_step: 'continue' as string,
+    next_step: 'continue',
   });
 
-  // Exam
-  const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>([]);
-  const [examAnswers, setExamAnswers] = useState<Record<string, string>>({});
-  const [examGraded, setExamGraded] = useState<ExamRecord | null>(null);
-  const [examLoading, setExamLoading] = useState(false);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [submittingExam, setSubmittingExam] = useState(false);
+  // Stats
+  const [questionsAsked, setQuestionsAsked] = useState(0);
+  const [quizzesTaken, setQuizzesTaken] = useState(0);
+  const [completedUnits, setCompletedUnits] = useState<Set<number>>(new Set());
 
-  // Profile
-  const [profile, setProfile] = useState<LearnerProfile>(mockProfile);
-  const [editingProfile, setEditingProfile] = useState(false);
+  const currentUnit = outline?.units[currentUnitIndex];
 
-  // Quick check expand
-  const [expandedChecks, setExpandedChecks] = useState<Set<number>>(new Set());
-
-  const selectedCourse = courses.find(c => c.id === selectedCourseId);
-
-  // Fetch profile on mount
+  // Auto-scroll chat
   useEffect(() => {
-    async function fetchProfile() {
-      try {
-        const res = await lesson.getProfile(1);
-        if (res.success && res.data) setProfile(res.data);
-      } catch { /* use mock */ }
-    }
-    fetchProfile();
-  }, []);
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
-  // Handle course creation
-  const handleCreateCourse = async () => {
-    if (!courseName.trim() || !materials.trim()) return;
-    setCreating(true);
-    try {
-      const res = await lesson.generateOutline(1, [materials], courseName);
-      if (res.success && res.data) {
-        const newCourse: LessonCourseItem = {
-          id: Date.now(),
-          course_name: courseName,
-          outline: res.data,
-          status: '新建',
-          created_at: new Date().toISOString(),
-        };
-        setCourses(prev => [...prev, newCourse]);
-        setSelectedCourseId(newCourse.id);
-        setView('list');
-        setCourseName('');
-        setMaterials('');
-      }
-    } catch { /* mock fallback */ }
-    setCreating(false);
+  // ============ Upload & Learn ============
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
   };
 
-  // Handle unit selection -> load lesson
-  const handleSelectUnit = async (unitIndex: number) => {
-    setSelectedUnitIndex(unitIndex);
-    setView('lesson');
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files) {
+      setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleStartLearn = async () => {
+    if (!courseName.trim() || files.length === 0) return;
+    setUploading(true);
+    setUploadProgress('正在解析课件...');
+
+    try {
+      const res = await lesson.uploadAndLearn(String(userId), courseName, files);
+      if (res.data || res.lesson_course_id) {
+        const data = res.data || res;
+        setUploadProgress('正在生成课程脉络...');
+        await new Promise(r => setTimeout(r, 500));
+        setUploadProgress('课程准备完成！');
+
+        if (data.outline) setOutline(data.outline);
+        if (data.lesson_course_id) setLessonCourseId(data.lesson_course_id);
+        if (data.files) {
+          const texts = data.files
+            .filter((f: FileRecord) => f.status === 'parsed')
+            .map((f: FileRecord) => `[${f.name}] - 已解析 ${f.chars} 字符`);
+          setRawTexts(texts.length > 0 ? texts : [mockRawText]);
+        }
+
+        setTimeout(() => setStep('learning'), 600);
+        return;
+      }
+    } catch {
+      // Fallback to mock
+    }
+
+    // Mock fallback
+    setUploadProgress('正在生成课程脉络...');
+    await new Promise(r => setTimeout(r, 800));
+    setUploadProgress('课程准备完成！');
+    setOutline(mockOutline);
+    setLessonCourseId(Date.now());
+    setRawTexts([mockRawText]);
+
+    setTimeout(() => setStep('learning'), 600);
+    setUploading(false);
+  };
+
+  // ============ Chat ============
+  const handleSendChat = async () => {
+    if (!chatInput.trim() || chatStreaming) return;
+    const question = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: question }]);
+    setChatStreaming(true);
+    setQuestionsAsked(prev => prev + 1);
+
+    let fullAnswer = '';
+    setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+    try {
+      if (lessonCourseId) {
+        await lesson.chatAboutCourseStream(
+          lessonCourseId,
+          question,
+          String(userId),
+          (chunk) => {
+            fullAnswer += chunk;
+            setChatMessages(prev => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { role: 'assistant', content: fullAnswer };
+              return updated;
+            });
+          }
+        );
+        setChatStreaming(false);
+        return;
+      }
+    } catch {
+      // Fallback to mock
+    }
+
+    // Mock streaming response
+    const mockResponses: Record<string, string> = {
+      default: '根据课件内容，这是一个很好的问题。数据结构与算法是计算机科学的基础，掌握好复杂度分析对于选择合适的算法至关重要。建议你从大O表示法开始，逐步理解不同复杂度级别的含义和适用场景。',
+    };
+    const answer = question.includes('复杂度')
+      ? '时间复杂度用大O表示法来描述算法的运行时间随输入规模增长的趋势。常见的有：O(1)常数时间、O(log n)对数时间、O(n)线性时间、O(n²)平方时间等。关键是要理解大O关注的是增长趋势，而非精确时间。'
+      : question.includes('排序')
+        ? '常见排序算法的复杂度：冒泡排序O(n²)、快速排序平均O(n log n)、归并排序O(n log n)、堆排序O(n log n)。选择排序算法时，需要考虑数据规模、是否需要稳定性、是否需要原地排序等因素。'
+        : mockResponses.default;
+
+    const words = answer.split('');
+    for (let i = 0; i < words.length; i++) {
+      fullAnswer += words[i];
+      setChatMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: 'assistant', content: fullAnswer };
+        return updated;
+      });
+      await new Promise(r => setTimeout(r, 20));
+    }
+    setChatStreaming(false);
+  };
+
+  // ============ Load Lesson Content ============
+  const loadLessonContent = useCallback(async (unitIndex: number) => {
+    setCurrentUnitIndex(unitIndex);
     setLessonLoading(true);
     setMastery(null);
     setExpandedChecks(new Set());
+    setActiveTab('content');
+
     try {
-      if (selectedCourseId) {
-        const res = await lesson.generateLesson(selectedCourseId, unitIndex);
+      if (lessonCourseId) {
+        const res = await lesson.generateLesson(lessonCourseId, unitIndex);
         if (res.success && res.data) {
           setLessonContent(res.data);
           setLessonLoading(false);
           return;
         }
       }
-    } catch { /* fallback to mock */ }
-    // Use mock data
+    } catch { /* fallback */ }
+
+    // Mock fallback
     setTimeout(() => {
-      setLessonContent({ ...mockLessonContent, title: selectedCourse?.outline.units[unitIndex]?.name || mockLessonContent.title });
+      const unit = outline?.units[unitIndex];
+      setLessonContent({
+        ...mockLessonContent,
+        title: unit?.name || mockLessonContent.title,
+        knowledge_points: unit?.knowledge_points || mockLessonContent.knowledge_points,
+      });
       setLessonLoading(false);
-    }, 800);
-  };
-
-  // Handle feedback submit
-  const handleSubmitFeedback = async () => {
-    if (!selectedCourseId || selectedUnitIndex === null) return;
-    try {
-      const res = await lesson.evaluateMastery(selectedCourseId, selectedUnitIndex, feedbackForm);
-      if (res.success && res.data) {
-        setMastery(res.data);
-        return;
-      }
-    } catch { /* fallback to mock */ }
-    setMastery(mockMastery);
-  };
-
-  // Handle exam
-  const handleStartExam = async () => {
-    if (!selectedCourseId) return;
-    setExamLoading(true);
-    setExamGraded(null);
-    setExamAnswers({});
-    setCurrentQuestionIndex(0);
-    setView('exam');
-    try {
-      const res = await lesson.generateExam(selectedCourseId);
-      if (res.success && res.data && res.data.questions.length > 0) {
-        setExamQuestions(res.data.questions);
-        setExamLoading(false);
-        return;
-      }
-    } catch { /* fallback to mock */ }
-    setTimeout(() => {
-      setExamQuestions(mockExamQuestions);
-      setExamLoading(false);
     }, 600);
-  };
+  }, [lessonCourseId, outline]);
 
-  // Handle exam submit
-  const handleSubmitExam = async () => {
-    if (!selectedCourseId) return;
-    setSubmittingExam(true);
-    try {
-      // Find exam id from the generated exam
-      const res = await lesson.gradeExam(Date.now(), examAnswers);
-      if (res.success && res.data) {
-        setExamGraded(res.data);
-        setSubmittingExam(false);
-        return;
-      }
-    } catch { /* fallback to mock */ }
-    // Mock grading
-    setTimeout(() => {
-      const graded: ExamRecord = {
-        id: 1,
-        lesson_course_id: selectedCourseId,
-        exam_type: 'final',
-        questions: examQuestions,
-        user_answers: examAnswers,
-        score: 75,
-        graded: examQuestions.map((q, i) => ({
-          question_index: i,
-          correct: examAnswers[i] === q.answer,
-          user_answer: examAnswers[i],
-          correct_answer: q.answer,
-        })),
-        round_num: 1,
-      };
-      setExamGraded(graded);
-      setSubmittingExam(false);
-    }, 800);
-  };
+  // ============ Quiz ============
+  const handleStartQuiz = async () => {
+    setQuizLoading(true);
+    setQuizSubmitted(false);
+    setQuizAnswers({});
+    setQuizScore(0);
+    setActiveTab('quiz');
 
-  // Handle consolidation
-  const handleConsolidation = async () => {
-    if (!examGraded) return;
-    setExamLoading(true);
     try {
-      const res = await lesson.generateConsolidation(examGraded.id);
-      if (res.success && res.data) {
-        setExamQuestions(res.data.questions);
-        setExamGraded(null);
-        setExamAnswers({});
-        setCurrentQuestionIndex(0);
-        setExamLoading(false);
-        return;
+      if (lessonCourseId) {
+        const res = await lesson.generateExam(lessonCourseId);
+        if (res.success && res.data && res.data.questions?.length > 0) {
+          setQuizQuestions(res.data.questions);
+          setQuizLoading(false);
+          return;
+        }
       }
     } catch { /* fallback */ }
-    setExamLoading(false);
+
+    setTimeout(() => {
+      setQuizQuestions(mockQuizQuestions);
+      setQuizLoading(false);
+    }, 500);
   };
 
-  // Navigate between units
-  const handlePrevUnit = () => {
-    if (selectedUnitIndex !== null && selectedUnitIndex > 0) {
-      handleSelectUnit(selectedUnitIndex - 1);
-    }
+  const handleSubmitQuiz = async () => {
+    setQuizSubmitted(true);
+    setQuizzesTaken(prev => prev + 1);
+    setCompletedUnits(prev => new Set([...prev, currentUnitIndex]));
+
+    let correct = 0;
+    quizQuestions.forEach((q, i) => {
+      if (quizAnswers[i] === q.answer) correct++;
+    });
+    setQuizScore(Math.round((correct / quizQuestions.length) * 100));
+
+    try {
+      if (lessonCourseId) {
+        await lesson.gradeExam(Date.now(), quizAnswers);
+      }
+    } catch { /* ignore */ }
   };
-  const handleNextUnit = () => {
-    if (selectedCourse && selectedUnitIndex !== null && selectedUnitIndex < selectedCourse.outline.units.length - 1) {
-      handleSelectUnit(selectedUnitIndex + 1);
-    }
+
+  // ============ Feedback ============
+  const handleSubmitFeedback = async () => {
+    try {
+      if (lessonCourseId) {
+        const res = await lesson.evaluateMastery(lessonCourseId, currentUnitIndex, feedbackForm);
+        if (res.success && res.data) {
+          setMastery(res.data);
+          return;
+        }
+      }
+    } catch { /* fallback */ }
+    setMastery({
+      mastery_level: '能听懂',
+      analysis: '学习者对基本概念有初步理解，但尚不能独立复述核心定义，需要更多练习和巩固。',
+      next_action: 'add_practice',
+      need_reinforce: true,
+    });
   };
 
-  // ============ Render: Left Panel ============
-  const renderLeftPanel = () => (
-    <div className="w-72 flex-shrink-0 bg-white border-r border-warm-200/60 flex flex-col h-full">
-      {/* Header */}
-      <div className="p-4 border-b border-warm-200/60">
-        <button
-          onClick={() => setView('create')}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors font-medium text-sm"
-        >
-          <Plus size={16} />
-          创建新课程
-        </button>
-      </div>
-
-      {/* Course List */}
-      <div className="flex-1 overflow-y-auto">
-        {courses.map(course => (
-          <div key={course.id} className="border-b border-warm-100">
-            <button
-              onClick={() => { setSelectedCourseId(course.id); setSelectedUnitIndex(null); setView('list'); }}
-              className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${
-                selectedCourseId === course.id ? 'bg-navy-50 text-navy-700' : 'hover:bg-warm-50 text-warm-700'
-              }`}
-            >
-              <BookOpen size={18} className={selectedCourseId === course.id ? 'text-navy-600' : 'text-warm-400'} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{course.course_name}</p>
-                <p className="text-xs text-warm-400 mt-0.5">{course.outline.units.length} 个单元 · {course.status}</p>
-              </div>
-              <ChevronRight size={16} className="text-warm-300" />
-            </button>
-
-            {/* Outline Timeline */}
-            {selectedCourseId === course.id && (
-              <div className="px-4 pb-3 space-y-0">
-                {course.outline.units.map((unit, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSelectUnit(idx)}
-                    className={`w-full text-left flex items-start gap-3 py-2 px-2 rounded-lg transition-colors group ${
-                      selectedUnitIndex === idx ? 'bg-emerald-50' : 'hover:bg-warm-50'
-                    }`}
-                  >
-                    {/* Timeline dot */}
-                    <div className="flex flex-col items-center mt-1">
-                      <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${
-                        selectedUnitIndex === idx ? 'bg-emerald-500 border-emerald-500' : 'border-warm-300 bg-white'
-                      }`} />
-                      {idx < course.outline.units.length - 1 && (
-                        <div className="w-0.5 h-6 bg-warm-200 mt-1" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${selectedUnitIndex === idx ? 'text-emerald-700 font-medium' : 'text-warm-600'}`}>
-                        {unit.name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <DifficultyBadge difficulty={unit.difficulty} />
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+  // ============ Render: Upload Step ============
+  const renderUploadStep = () => (
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-navy-50 via-white to-emerald-50 animate-fadeIn">
+      <div className="w-full max-w-2xl mx-4">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-navy-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <GraduationCap size={32} className="text-white" />
           </div>
-        ))}
-      </div>
-    </div>
-  );
+          <h1 className="text-3xl font-bold text-navy-600 mb-2">课程学习</h1>
+          <p className="text-warm-500">上传课件，AI 帮你解析、索引、生成课程脉络</p>
+        </div>
 
-  // ============ Render: Course Creation ============
-  const renderCreateView = () => (
-    <div className="max-w-2xl mx-auto animate-fadeIn">
-      <div className="bg-white rounded-xl shadow-card p-8">
-        <h2 className="text-xl font-bold text-navy-600 mb-6 flex items-center gap-2">
-          <Plus size={24} className="text-emerald-500" />
-          创建新课程
-        </h2>
-
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1.5">课程名称</label>
+        <div className="bg-white rounded-2xl shadow-card-hover p-8 border border-warm-100">
+          {/* Course Name */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-warm-700 mb-2">课程名称</label>
             <input
               type="text"
               value={courseName}
               onChange={e => setCourseName(e.target.value)}
-              placeholder="例如：机器学习基础"
-              className="w-full px-4 py-2.5 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none transition text-sm"
+              placeholder="例如：数据结构与算法"
+              className="w-full px-4 py-3 border border-warm-200 rounded-xl focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none transition text-sm"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1.5">课程材料</label>
-            <textarea
-              value={materials}
-              onChange={e => setMaterials(e.target.value)}
-              placeholder="粘贴课程大纲、教材目录、学习资料等..."
-              rows={10}
-              className="w-full px-4 py-2.5 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none transition text-sm resize-none"
-            />
+          {/* Upload Area */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-warm-700 mb-2">课件文件</label>
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                dragOver
+                  ? 'border-emerald-400 bg-emerald-50'
+                  : 'border-warm-200 hover:border-navy-300 hover:bg-navy-50/30'
+              }`}
+            >
+              <Upload size={40} className={`mx-auto mb-3 ${dragOver ? 'text-emerald-500' : 'text-warm-300'}`} />
+              <p className="text-sm font-medium text-warm-600 mb-1">拖拽或点击上传课件文件</p>
+              <p className="text-xs text-warm-400">支持 PPT、PPTX、PDF、DOCX、TXT 格式，可多选</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".ppt,.pptx,.pdf,.docx,.doc,.txt"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => setView('list')}
-              className="px-5 py-2.5 border border-warm-200 text-warm-600 rounded-lg hover:bg-warm-50 transition text-sm font-medium"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleCreateCourse}
-              disabled={creating || !courseName.trim() || !materials.trim()}
-              className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
-            >
-              {creating ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  正在生成课程脉络...
-                </>
-              ) : (
-                '生成课程脉络'
-              )}
-            </button>
-          </div>
+          {/* File List */}
+          {files.length > 0 && (
+            <div className="mb-6 space-y-2">
+              {files.map((file, i) => (
+                <div key={i} className="flex items-center gap-3 bg-warm-50 rounded-lg px-4 py-2.5">
+                  <File size={18} className="text-navy-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-warm-700 truncate">{file.name}</p>
+                    <p className="text-xs text-warm-400">{(file.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                    className="p-1 text-warm-400 hover:text-red-500 transition"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <button
+            onClick={handleStartLearn}
+            disabled={uploading || !courseName.trim() || files.length === 0}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium text-sm shadow-sm"
+          >
+            {uploading ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                {uploadProgress}
+              </>
+            ) : (
+              <>
+                <ArrowRight size={18} />
+                开始学习
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
   );
 
-  // ============ Render: Lesson View ============
-  const renderLessonView = () => {
+  // ============ Render: Learning Step ============
+  const renderLearningStep = () => (
+    <div className="flex h-[calc(100vh-4rem)]">
+      {/* Left Column: Course Outline */}
+      <div className="w-1/4 min-w-[260px] flex-shrink-0 bg-white border-r border-warm-200/60 flex flex-col h-full">
+        <div className="p-4 border-b border-warm-200/60">
+          <h2 className="text-sm font-bold text-navy-600 flex items-center gap-2">
+            <BookOpen size={16} />
+            {outline?.course_name || courseName}
+          </h2>
+          <p className="text-xs text-warm-400 mt-1">{outline?.units.length || 0} 个学习单元</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+          {outline?.units.map((unit, idx) => (
+            <button
+              key={idx}
+              onClick={() => loadLessonContent(idx)}
+              className={`w-full text-left flex items-start gap-3 p-3 rounded-xl transition-all group ${
+                currentUnitIndex === idx
+                  ? 'bg-navy-600 text-white shadow-md'
+                  : completedUnits.has(idx)
+                    ? 'bg-emerald-50 hover:bg-emerald-100'
+                    : 'hover:bg-warm-50'
+              }`}
+            >
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                currentUnitIndex === idx
+                  ? 'bg-white/20 text-white'
+                  : completedUnits.has(idx)
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-warm-100 text-warm-500'
+              }`}>
+                {completedUnits.has(idx) ? <CheckCircle2 size={14} /> : idx + 1}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium truncate ${
+                  currentUnitIndex === idx ? 'text-white' : 'text-warm-700'
+                }`}>
+                  {unit.name}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  {currentUnitIndex !== idx && <DifficultyBadge difficulty={unit.difficulty} />}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* New Course Button */}
+        <div className="p-3 border-t border-warm-200/60">
+          <button
+            onClick={() => {
+              setStep('upload');
+              setOutline(null);
+              setFiles([]);
+              setCourseName('');
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2 text-sm text-warm-500 hover:text-navy-600 hover:bg-warm-50 rounded-lg transition"
+          >
+            <Upload size={14} />
+            上传新课程
+          </button>
+        </div>
+      </div>
+
+      {/* Center Column: Main Learning Area */}
+      <div className="flex-1 flex flex-col h-full min-w-0">
+        {/* Tabs */}
+        <div className="bg-white border-b border-warm-200/60 px-4">
+          <div className="flex gap-1">
+            {([
+              { key: 'chat', label: '课程对话', icon: <MessageSquare size={16} /> },
+              { key: 'content', label: '课程内容', icon: <BookOpen size={16} /> },
+              { key: 'quiz', label: '智能测验', icon: <Brain size={16} /> },
+              { key: 'raw', label: '课件原文', icon: <FileText size={16} /> },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.key
+                    ? 'border-navy-600 text-navy-600'
+                    : 'border-transparent text-warm-400 hover:text-warm-600'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === 'chat' && renderChatTab()}
+          {activeTab === 'content' && renderContentTab()}
+          {activeTab === 'quiz' && renderQuizTab()}
+          {activeTab === 'raw' && renderRawTab()}
+        </div>
+      </div>
+
+      {/* Right Column: Learning Status */}
+      <div className="w-1/4 min-w-[260px] flex-shrink-0 bg-white border-l border-warm-200/60 overflow-y-auto">
+        <div className="p-4 space-y-5">
+          {/* Mastery Level */}
+          <div>
+            <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-3 flex items-center gap-1">
+              <BarChart3 size={12} /> 掌握度
+            </h3>
+            <MasteryBar level={mastery?.mastery_level || '未接触'} />
+            <div className="flex justify-between mt-2">
+              {['未接触', '能听懂', '能复述', '能做题', '能应用', '能迁移'].map((l, i) => (
+                <div key={i} className="flex flex-col items-center">
+                  <div className={`w-2 h-2 rounded-full ${
+                    i <= ['未接触', '能听懂', '能复述', '能做题', '能应用', '能迁移'].indexOf(mastery?.mastery_level || '未接触')
+                      ? 'bg-emerald-500' : 'bg-warm-200'
+                  }`} />
+                  <span className="text-[9px] text-warm-400 mt-1">{l.slice(0, 2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Learning Progress */}
+          <div>
+            <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-3 flex items-center gap-1">
+              <Target size={12} /> 学习进度
+            </h3>
+            <div className="space-y-2">
+              {outline?.units.map((unit, idx) => (
+                <div key={idx} className={`flex items-center gap-2 text-xs ${
+                  completedUnits.has(idx) ? 'text-emerald-600' :
+                    idx === currentUnitIndex ? 'text-navy-600 font-medium' : 'text-warm-400'
+                }`}>
+                  {completedUnits.has(idx) ? (
+                    <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
+                  ) : idx === currentUnitIndex ? (
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-navy-500 flex-shrink-0" />
+                  ) : (
+                    <div className="w-3.5 h-3.5 rounded-full border border-warm-300 flex-shrink-0" />
+                  )}
+                  <span className="truncate">{unit.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div>
+            <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-3 flex items-center gap-1">
+              <Clock size={12} /> 学习统计
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-navy-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-navy-600">{questionsAsked}</div>
+                <div className="text-[10px] text-warm-500">提问次数</div>
+              </div>
+              <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-emerald-600">{quizzesTaken}</div>
+                <div className="text-[10px] text-warm-500">测验次数</div>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3 text-center col-span-2">
+                <div className="text-lg font-bold text-amber-600">
+                  {completedUnits.size}/{outline?.units.length || 0}
+                </div>
+                <div className="text-[10px] text-warm-500">已完成单元</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Current Unit Info */}
+          {currentUnit && (
+            <div>
+              <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-3 flex items-center gap-1">
+                <Lightbulb size={12} /> 当前单元
+              </h3>
+              <div className="bg-warm-50 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-medium text-warm-800">{currentUnit.name}</p>
+                <DifficultyBadge difficulty={currentUnit.difficulty} />
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {currentUnit.knowledge_points.map((kp, i) => (
+                    <span key={i} className="text-[10px] bg-navy-50 text-navy-600 px-2 py-0.5 rounded-full">
+                      {kp}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============ Chat Tab ============
+  const renderChatTab = () => (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {chatMessages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
+            <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+              msg.role === 'user'
+                ? 'bg-navy-600 text-white rounded-br-md'
+                : 'bg-warm-50 text-warm-800 rounded-bl-md border border-warm-100'
+            }`}>
+              {msg.role === 'assistant' && (
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <GraduationCap size={14} className="text-emerald-500" />
+                  <span className="text-xs font-medium text-emerald-600">课程助手</span>
+                </div>
+              )}
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content || '...'}</p>
+            </div>
+          </div>
+        ))}
+        <div ref={chatEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-warm-200/60 bg-white p-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendChat()}
+            placeholder="输入关于课程的问题..."
+            disabled={chatStreaming}
+            className="flex-1 px-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none text-sm disabled:opacity-50"
+          />
+          <button
+            onClick={handleSendChat}
+            disabled={chatStreaming || !chatInput.trim()}
+            className="flex items-center justify-center w-10 h-10 bg-navy-600 text-white rounded-xl hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {chatStreaming ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============ Content Tab ============
+  const renderContentTab = () => {
     if (lessonLoading) {
       return (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <Loader2 size={40} className="animate-spin text-navy-600 mx-auto mb-4" />
             <p className="text-warm-500">正在生成课程内容...</p>
@@ -511,185 +789,142 @@ export default function Lesson() {
       );
     }
 
-    if (!lessonContent) return null;
-
-    return (
-      <div className="flex-1 overflow-y-auto animate-fadeIn">
-        {/* Top bar: mastery + navigation */}
-        <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-warm-200/60 px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 max-w-md">
-              {mastery && <MasteryBar level={mastery.mastery_level} />}
-            </div>
-            <div className="flex items-center gap-2 ml-4">
-              <button
-                onClick={handlePrevUnit}
-                disabled={selectedUnitIndex === 0}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm text-warm-600 border border-warm-200 rounded-lg hover:bg-warm-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                <ChevronLeft size={16} />
-                上一课
-              </button>
-              <button
-                onClick={handleNextUnit}
-                disabled={!selectedCourse || selectedUnitIndex === selectedCourse.outline.units.length - 1}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm text-warm-600 border border-warm-200 rounded-lg hover:bg-warm-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                下一课
-                <ChevronRight size={16} />
-              </button>
-              <button
-                onClick={handleStartExam}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition"
-              >
-                <Award size={16} />
-                开始考试
-              </button>
-            </div>
+    if (!lessonContent) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <BookOpen size={48} className="text-warm-200 mx-auto mb-4" />
+            <p className="text-warm-400">从左侧选择一个单元开始学习</p>
           </div>
         </div>
+      );
+    }
 
-        {/* Lesson content */}
-        <div className="max-w-3xl mx-auto px-6 py-8">
-          {/* Title & Objectives */}
-          <h1 className="text-2xl font-bold text-navy-600 mb-4">{lessonContent.title}</h1>
+    return (
+      <div className="max-w-3xl mx-auto px-6 py-6 animate-fadeIn">
+        {/* Title & Objectives */}
+        <h1 className="text-2xl font-bold text-navy-600 mb-4">{lessonContent.title}</h1>
 
-          <div className="bg-navy-50 rounded-xl p-5 mb-8">
-            <h3 className="text-sm font-semibold text-navy-700 mb-2 flex items-center gap-2">
-              <Target size={16} />
-              学习目标
-            </h3>
-            <ul className="space-y-1.5">
-              {lessonContent.objectives.map((obj, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-navy-600">
-                  <CheckCircle2 size={14} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                  {obj}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Sections */}
-          <div className="space-y-6">
-            {lessonContent.sections.map((section, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-card hover:shadow-card-hover transition-shadow p-6 border border-warm-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-warm-50 flex items-center justify-center">
-                    <SectionIcon type={section.type} />
-                  </div>
-                  <h3 className="text-base font-semibold text-warm-800">{section.title}</h3>
-                </div>
-                <div className="text-sm text-warm-600 leading-relaxed whitespace-pre-line pl-12">
-                  {section.content}
-                </div>
-              </div>
+        <div className="bg-navy-50 rounded-xl p-5 mb-6">
+          <h3 className="text-sm font-semibold text-navy-700 mb-2 flex items-center gap-2">
+            <Target size={16} />
+            学习目标
+          </h3>
+          <ul className="space-y-1.5">
+            {lessonContent.objectives.map((obj, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-navy-600">
+                <CheckCircle2 size={14} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                {obj}
+              </li>
             ))}
-          </div>
+          </ul>
+        </div>
 
-          {/* Quick Check */}
-          {lessonContent.quick_check.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-base font-semibold text-warm-800 mb-4 flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-teal-500" />
-                快速检查
-              </h3>
-              <div className="space-y-3">
-                {lessonContent.quick_check.map((qc, i) => (
-                  <div key={i} className="bg-white rounded-xl shadow-card border border-warm-100 overflow-hidden">
-                    <button
-                      onClick={() => setExpandedChecks(prev => {
-                        const next = new Set(prev);
-                        if (next.has(i)) next.delete(i); else next.add(i);
-                        return next;
-                      })}
-                      className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-warm-50 transition"
-                    >
-                      <span className="text-sm font-medium text-warm-700">{qc.question}</span>
-                      {expandedChecks.has(i) ? <ChevronUp size={16} className="text-warm-400" /> : <ChevronDown size={16} className="text-warm-400" />}
-                    </button>
-                    {expandedChecks.has(i) && (
-                      <div className="px-5 pb-4 pt-1 border-t border-warm-100">
-                        <p className="text-sm text-emerald-600 flex items-start gap-2">
-                          <Lightbulb size={14} className="mt-0.5 flex-shrink-0" />
-                          提示：{qc.answer_hint}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Feedback Entry */}
-          <div className="mt-8 bg-white rounded-xl shadow-card border border-warm-100 p-6">
-            <h3 className="text-base font-semibold text-warm-800 mb-4 flex items-center gap-2">
-              <MessageSquare size={18} className="text-rose-500" />
-              反馈入口
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1">你能复述这节课的核心内容吗？</label>
-                <textarea
-                  value={feedbackForm.can_retell}
-                  onChange={e => setFeedbackForm(prev => ({ ...prev, can_retell: e.target.value }))}
-                  rows={3}
-                  placeholder="用自己的话描述..."
-                  className="w-full px-3 py-2 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none text-sm resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1">你卡在哪里了？</label>
-                <input
-                  type="text"
-                  value={feedbackForm.stuck_at}
-                  onChange={e => setFeedbackForm(prev => ({ ...prev, stuck_at: e.target.value }))}
-                  placeholder="描述你不理解的部分..."
-                  className="w-full px-3 py-2 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1">
-                  难度感受: <span className="text-emerald-600 font-bold">{feedbackForm.difficulty}</span>/5
-                </label>
-                <input
-                  type="range"
-                  min={1}
-                  max={5}
-                  value={feedbackForm.difficulty}
-                  onChange={e => setFeedbackForm(prev => ({ ...prev, difficulty: Number(e.target.value) }))}
-                  className="w-full accent-emerald-500"
-                />
-                <div className="flex justify-between text-xs text-warm-400">
-                  <span>很简单</span><span>非常难</span>
+        {/* Sections */}
+        <div className="space-y-4">
+          {lessonContent.sections.map((section, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-card hover:shadow-card-hover transition-shadow p-5 border border-warm-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-lg bg-warm-50 flex items-center justify-center">
+                  <SectionIcon type={section.type} />
                 </div>
+                <h3 className="text-base font-semibold text-warm-800">{section.title}</h3>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1">下一步</label>
-                <select
-                  value={feedbackForm.next_step}
-                  onChange={e => setFeedbackForm(prev => ({ ...prev, next_step: e.target.value }))}
-                  className="w-full px-3 py-2 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none text-sm"
-                >
-                  <option value="continue">继续下一课</option>
-                  <option value="supplement">补充解释</option>
-                  <option value="change_example">换个例子</option>
-                  <option value="add_practice">增加练习</option>
-                  <option value="downgrade">降低难度</option>
-                </select>
+              <div className="text-sm text-warm-600 leading-relaxed whitespace-pre-line pl-12">
+                {section.content}
               </div>
-              <button
-                onClick={handleSubmitFeedback}
-                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition text-sm font-medium"
-              >
-                <Send size={14} />
-                提交反馈
-              </button>
             </div>
+          ))}
+        </div>
 
-            {/* Mastery result */}
+        {/* Quick Check */}
+        {lessonContent.quick_check.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-base font-semibold text-warm-800 mb-3 flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-teal-500" />
+              快速检查
+            </h3>
+            <div className="space-y-2">
+              {lessonContent.quick_check.map((qc, i) => (
+                <div key={i} className="bg-white rounded-xl shadow-card border border-warm-100 overflow-hidden">
+                  <button
+                    onClick={() => setExpandedChecks(prev => {
+                      const next = new Set(prev);
+                      if (next.has(i)) next.delete(i); else next.add(i);
+                      return next;
+                    })}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-warm-50 transition"
+                  >
+                    <span className="text-sm font-medium text-warm-700">{qc.question}</span>
+                    {expandedChecks.has(i) ? <ChevronUp size={16} className="text-warm-400" /> : <ChevronDown size={16} className="text-warm-400" />}
+                  </button>
+                  {expandedChecks.has(i) && (
+                    <div className="px-4 pb-3 pt-1 border-t border-warm-100">
+                      <p className="text-sm text-emerald-600 flex items-start gap-2">
+                        <Lightbulb size={14} className="mt-0.5 flex-shrink-0" />
+                        提示：{qc.answer_hint}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Feedback Entry */}
+        <div className="mt-6 bg-white rounded-xl shadow-card border border-warm-100 p-5">
+          <h3 className="text-base font-semibold text-warm-800 mb-4 flex items-center gap-2">
+            <MessageSquare size={18} className="text-rose-500" />
+            反馈入口
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-warm-700 mb-1">你能复述这节课的核心内容吗？</label>
+              <textarea
+                value={feedbackForm.can_retell}
+                onChange={e => setFeedbackForm(prev => ({ ...prev, can_retell: e.target.value }))}
+                rows={3}
+                placeholder="用自己的话描述..."
+                className="w-full px-3 py-2 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none text-sm resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-warm-700 mb-1">你卡在哪里了？</label>
+              <input
+                type="text"
+                value={feedbackForm.stuck_at}
+                onChange={e => setFeedbackForm(prev => ({ ...prev, stuck_at: e.target.value }))}
+                placeholder="描述你不理解的部分..."
+                className="w-full px-3 py-2 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-warm-700 mb-1">
+                难度感受: <span className="text-emerald-600 font-bold">{feedbackForm.difficulty}</span>/5
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={feedbackForm.difficulty}
+                onChange={e => setFeedbackForm(prev => ({ ...prev, difficulty: Number(e.target.value) }))}
+                className="w-full accent-emerald-500"
+              />
+              <div className="flex justify-between text-xs text-warm-400">
+                <span>很简单</span><span>非常难</span>
+              </div>
+            </div>
+            <button
+              onClick={handleSubmitFeedback}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition text-sm font-medium"
+            >
+              <Send size={14} />
+              提交反馈
+            </button>
+
             {mastery && (
-              <div className={`mt-5 p-4 rounded-lg border ${
+              <div className={`p-4 rounded-lg border ${
                 mastery.need_reinforce ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
               }`}>
                 <div className="flex items-center gap-2 mb-2">
@@ -706,452 +941,202 @@ export default function Lesson() {
     );
   };
 
-  // ============ Render: Exam View ============
-  const renderExamView = () => {
-    if (examLoading) {
+  // ============ Quiz Tab ============
+  const renderQuizTab = () => {
+    if (quizLoading) {
       return (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <Loader2 size={40} className="animate-spin text-navy-600 mx-auto mb-4" />
-            <p className="text-warm-500">正在生成试卷...</p>
+            <p className="text-warm-500">正在生成测验题目...</p>
           </div>
         </div>
       );
     }
 
-    const q = examQuestions[currentQuestionIndex];
-    if (!q) return null;
+    if (quizQuestions.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <Brain size={48} className="text-warm-200 mx-auto mb-4" />
+            <p className="text-warm-400 mb-4">点击下方按钮开始智能测验</p>
+            <button
+              onClick={handleStartQuiz}
+              className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition font-medium text-sm mx-auto"
+            >
+              <Award size={18} />
+              开始测验
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
-      <div className="flex-1 overflow-y-auto animate-fadeIn">
-        <div className="max-w-3xl mx-auto px-6 py-8">
-          {/* Exam header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-navy-600 flex items-center gap-2">
-              <Award size={24} className="text-emerald-500" />
-              课程测验
-            </h2>
-            <span className="text-sm text-warm-500">
-              第 {currentQuestionIndex + 1} / {examQuestions.length} 题
-            </span>
-          </div>
-
-          {/* Progress bar */}
-          <div className="w-full h-2 bg-warm-100 rounded-full mb-8 overflow-hidden">
-            <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-              style={{ width: `${((currentQuestionIndex + 1) / examQuestions.length) * 100}%` }}
-            />
-          </div>
-
-          {/* Question card */}
-          <div className="bg-white rounded-xl shadow-card border border-warm-100 p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                q.type === 'single_choice' ? 'bg-blue-100 text-blue-700' :
-                q.type === 'multi_choice' ? 'bg-purple-100 text-purple-700' :
-                q.type === 'concept' ? 'bg-teal-100 text-teal-700' :
-                'bg-amber-100 text-amber-700'
-              }`}>
-                {q.type === 'single_choice' ? '单选题' : q.type === 'multi_choice' ? '多选题' : q.type === 'concept' ? '概念题' : '案例分析'}
-              </span>
-              <span className="text-xs text-warm-400">知识点: {q.knowledge_point}</span>
-            </div>
-            <p className="text-base font-medium text-warm-800 mb-5">{q.question}</p>
-
-            {/* Single choice */}
-            {q.type === 'single_choice' && q.options && (
-              <div className="space-y-2.5">
-                {q.options.map((opt, i) => {
-                  const letter = String.fromCharCode(65 + i);
-                  const isSelected = examAnswers[currentQuestionIndex] === letter;
-                  const isCorrect = examGraded && q.answer.includes(letter);
-                  const isWrong = examGraded && isSelected && !q.answer.includes(letter);
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => !examGraded && setExamAnswers(prev => ({ ...prev, [currentQuestionIndex]: letter }))}
-                      className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg border transition text-sm ${
-                        examGraded
-                          ? isCorrect ? 'bg-emerald-50 border-emerald-300 text-emerald-700' :
-                            isWrong ? 'bg-red-50 border-red-300 text-red-700' :
-                            'border-warm-200 text-warm-600'
-                          : isSelected
-                            ? 'bg-navy-50 border-navy-300 text-navy-700'
-                            : 'border-warm-200 text-warm-600 hover:bg-warm-50'
-                      }`}
-                    >
-                      <span className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-medium flex-shrink-0 ${
-                        examGraded
-                          ? isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' :
-                            isWrong ? 'bg-red-500 border-red-500 text-white' :
-                            'border-warm-300 text-warm-500'
-                          : isSelected ? 'bg-navy-600 border-navy-600 text-white' : 'border-warm-300 text-warm-500'
-                      }`}>
-                        {letter}
-                      </span>
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Multi choice */}
-            {q.type === 'multi_choice' && q.options && (
-              <div className="space-y-2.5">
-                {q.options.map((opt, i) => {
-                  const letter = String.fromCharCode(65 + i);
-                  const currentAnswer = examAnswers[currentQuestionIndex] || '';
-                  const isSelected = currentAnswer.includes(letter);
-                  const correctLetters = q.answer.split(',');
-                  const isCorrect = examGraded && correctLetters.includes(letter);
-                  const isWrong = examGraded && isSelected && !correctLetters.includes(letter);
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        if (examGraded) return;
-                        const current = examAnswers[currentQuestionIndex] || '';
-                        const letters = current ? current.split(',') : [];
-                        const newLetters = isSelected
-                          ? letters.filter(l => l !== letter)
-                          : [...letters, letter].sort();
-                        setExamAnswers(prev => ({ ...prev, [currentQuestionIndex]: newLetters.join(',') }));
-                      }}
-                      className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg border transition text-sm ${
-                        examGraded
-                          ? isCorrect ? 'bg-emerald-50 border-emerald-300 text-emerald-700' :
-                            isWrong ? 'bg-red-50 border-red-300 text-red-700' :
-                            'border-warm-200 text-warm-600'
-                          : isSelected
-                            ? 'bg-navy-50 border-navy-300 text-navy-700'
-                            : 'border-warm-200 text-warm-600 hover:bg-warm-50'
-                      }`}
-                    >
-                      <span className={`w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-medium flex-shrink-0 ${
-                        examGraded
-                          ? isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' :
-                            isWrong ? 'bg-red-500 border-red-500 text-white' :
-                            'border-warm-300 text-warm-500'
-                          : isSelected ? 'bg-navy-600 border-navy-600 text-white' : 'border-warm-300 text-warm-500'
-                      }`}>
-                        {isSelected ? '✓' : letter}
-                      </span>
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Concept explanation */}
-            {q.type === 'concept' && (
-              <textarea
-                value={examAnswers[currentQuestionIndex] || ''}
-                onChange={e => setExamAnswers(prev => ({ ...prev, [currentQuestionIndex]: e.target.value }))}
-                disabled={!!examGraded}
-                placeholder="请用自己的话解释..."
-                rows={5}
-                className="w-full px-4 py-3 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none text-sm resize-none disabled:bg-warm-50"
-              />
-            )}
-
-            {/* Case study */}
-            {q.type === 'case_study' && (
-              <div className="space-y-4">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <p className="text-xs font-medium text-amber-700 mb-1">案例分析</p>
-                  <p className="text-sm text-amber-800">{q.question}</p>
-                </div>
-                <textarea
-                  value={examAnswers[currentQuestionIndex] || ''}
-                  onChange={e => setExamAnswers(prev => ({ ...prev, [currentQuestionIndex]: e.target.value }))}
-                  disabled={!!examGraded}
-                  placeholder="请分析并回答..."
-                  rows={6}
-                  className="w-full px-4 py-3 border border-warm-200 rounded-lg focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none text-sm resize-none disabled:bg-warm-50"
-                />
-              </div>
-            )}
-
-            {/* Explanation after grading */}
-            {examGraded && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs font-medium text-blue-700 mb-1">解析</p>
-                <p className="text-sm text-blue-800">{q.explanation}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Navigation */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-              disabled={currentQuestionIndex === 0}
-              className="flex items-center gap-1 px-4 py-2 text-sm text-warm-600 border border-warm-200 rounded-lg hover:bg-warm-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-            >
-              <ChevronLeft size={16} />
-              上一题
-            </button>
-
-            {!examGraded ? (
-              currentQuestionIndex === examQuestions.length - 1 ? (
-                <button
-                  onClick={handleSubmitExam}
-                  disabled={submittingExam}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition text-sm font-medium"
-                >
-                  {submittingExam ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  提交答案
-                </button>
-              ) : (
-                <button
-                  onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                  className="flex items-center gap-1 px-4 py-2 text-sm text-warm-600 border border-warm-200 rounded-lg hover:bg-warm-50 transition"
-                >
-                  下一题
-                  <ChevronRight size={16} />
-                </button>
-              )
-            ) : (
-              <div className="flex items-center gap-3">
-                {examGraded.score < 80 && (
-                  <button
-                    onClick={handleConsolidation}
-                    className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition text-sm font-medium"
-                  >
-                    生成巩固卷
-                  </button>
-                )}
-                <button
-                  onClick={() => { setView('lesson'); setExamGraded(null); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition text-sm font-medium"
-                >
-                  返回课程
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Score display */}
-          {examGraded && (
-            <div className="mt-8 bg-white rounded-xl shadow-card border border-warm-100 p-6 text-center">
-              <div className={`text-5xl font-bold mb-2 ${
-                examGraded.score >= 80 ? 'text-emerald-500' : examGraded.score >= 60 ? 'text-amber-500' : 'text-red-500'
-              }`}>
-                {examGraded.score}
-              </div>
-              <p className="text-warm-500 text-sm">总分</p>
-              <div className="flex justify-center gap-6 mt-4 text-sm">
-                <span className="text-emerald-600">
-                  正确: {examGraded.graded.filter((g: any) => g.correct).length}
-                </span>
-                <span className="text-red-600">
-                  错误: {examGraded.graded.filter((g: any) => !g.correct).length}
-                </span>
-              </div>
-            </div>
+      <div className="max-w-3xl mx-auto px-6 py-6 animate-fadeIn">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-navy-600 flex items-center gap-2">
+            <Award size={24} className="text-emerald-500" />
+            智能测验
+          </h2>
+          {!quizSubmitted && (
+            <span className="text-sm text-warm-500">{quizQuestions.length} 道题</span>
           )}
         </div>
+
+        {/* Score Display */}
+        {quizSubmitted && (
+          <div className="bg-white rounded-xl shadow-card border border-warm-100 p-6 text-center mb-6">
+            <div className={`text-5xl font-bold mb-2 ${
+              quizScore >= 80 ? 'text-emerald-500' : quizScore >= 60 ? 'text-amber-500' : 'text-red-500'
+            }`}>
+              {quizScore}
+            </div>
+            <p className="text-warm-500 text-sm">得分</p>
+            <div className="flex justify-center gap-6 mt-3 text-sm">
+              <span className="text-emerald-600">
+                正确: {quizQuestions.filter((q, i) => quizAnswers[i] === q.answer).length}
+              </span>
+              <span className="text-red-600">
+                错误: {quizQuestions.filter((q, i) => quizAnswers[i] !== q.answer).length}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setQuizQuestions([]);
+                setQuizSubmitted(false);
+                setQuizAnswers({});
+              }}
+              className="mt-4 px-5 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition text-sm font-medium"
+            >
+              重新测验
+            </button>
+          </div>
+        )}
+
+        {/* Questions */}
+        <div className="space-y-4">
+          {quizQuestions.map((q, qi) => (
+            <div key={qi} className="bg-white rounded-xl shadow-card border border-warm-100 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-navy-50 text-navy-600">
+                  第 {qi + 1} 题
+                </span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  q.type === 'single_choice' ? 'bg-blue-100 text-blue-700' :
+                  q.type === 'multi_choice' ? 'bg-purple-100 text-purple-700' :
+                  'bg-teal-100 text-teal-700'
+                }`}>
+                  {q.type === 'single_choice' ? '单选题' : q.type === 'multi_choice' ? '多选题' : '概念题'}
+                </span>
+              </div>
+              <p className="text-sm font-medium text-warm-800 mb-4">{q.question}</p>
+
+              {q.options && (
+                <div className="space-y-2">
+                  {q.options.map((opt, oi) => {
+                    const letter = String.fromCharCode(65 + oi);
+                    const isSelected = q.type === 'multi_choice'
+                      ? (quizAnswers[qi] || '').includes(letter)
+                      : quizAnswers[qi] === letter;
+                    const correctLetters = q.answer.split(',');
+                    const isCorrect = quizSubmitted && correctLetters.includes(letter);
+                    const isWrong = quizSubmitted && isSelected && !correctLetters.includes(letter);
+
+                    return (
+                      <button
+                        key={oi}
+                        onClick={() => {
+                          if (quizSubmitted) return;
+                          if (q.type === 'multi_choice') {
+                            const current = quizAnswers[qi] || '';
+                            const letters = current ? current.split(',') : [];
+                            const newLetters = isSelected
+                              ? letters.filter(l => l !== letter)
+                              : [...letters, letter].sort();
+                            setQuizAnswers(prev => ({ ...prev, [qi]: newLetters.join(',') }));
+                          } else {
+                            setQuizAnswers(prev => ({ ...prev, [qi]: letter }));
+                          }
+                        }}
+                        className={`w-full text-left flex items-center gap-3 px-4 py-2.5 rounded-lg border transition text-sm ${
+                          quizSubmitted
+                            ? isCorrect ? 'bg-emerald-50 border-emerald-300 text-emerald-700' :
+                              isWrong ? 'bg-red-50 border-red-300 text-red-700' :
+                              'border-warm-200 text-warm-600'
+                            : isSelected
+                              ? 'bg-navy-50 border-navy-300 text-navy-700'
+                              : 'border-warm-200 text-warm-600 hover:bg-warm-50'
+                        }`}
+                      >
+                        <span className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-medium flex-shrink-0 ${
+                          quizSubmitted
+                            ? isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' :
+                              isWrong ? 'bg-red-500 border-red-500 text-white' :
+                              'border-warm-300 text-warm-500'
+                            : isSelected ? 'bg-navy-600 border-navy-600 text-white' : 'border-warm-300 text-warm-500'
+                        }`}>
+                          {isSelected && q.type === 'multi_choice' ? '✓' : letter}
+                        </span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {quizSubmitted && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs font-medium text-blue-700 mb-1">解析</p>
+                  <p className="text-sm text-blue-800">{q.explanation}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {!quizSubmitted && quizQuestions.length > 0 && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={handleSubmitQuiz}
+              className="px-8 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition font-medium text-sm"
+            >
+              提交答案
+            </button>
+          </div>
+        )}
       </div>
     );
   };
 
-  // ============ Render: Right Panel ============
-  const renderRightPanel = () => (
-    <div className="w-72 flex-shrink-0 bg-white border-l border-warm-200/60 overflow-y-auto">
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-warm-800 flex items-center gap-2">
-            <GraduationCap size={16} className="text-navy-600" />
-            学习者画像
-          </h3>
-          <button
-            onClick={() => setEditingProfile(!editingProfile)}
-            className="p-1.5 text-warm-400 hover:text-navy-600 hover:bg-warm-50 rounded-lg transition"
+  // ============ Raw Text Tab ============
+  const renderRawTab = () => (
+    <div className="max-w-3xl mx-auto px-6 py-6 animate-fadeIn">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-navy-600 flex items-center gap-2">
+          <FileText size={20} className="text-emerald-500" />
+          课件原文
+        </h2>
+        {rawTexts.length > 1 && (
+          <select
+            value={selectedRawFile}
+            onChange={e => setSelectedRawFile(Number(e.target.value))}
+            className="text-sm border border-warm-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500 outline-none"
           >
-            {editingProfile ? <X size={14} /> : <Edit3 size={14} />}
-          </button>
-        </div>
-
-        {/* Goals */}
-        <div className="mb-4">
-          <h4 className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-            <Target size={12} /> 学习目标
-          </h4>
-          <div className="space-y-1.5 text-sm">
-            <div className="bg-navy-50 rounded-lg p-3">
-              <p className="text-xs text-navy-500 mb-0.5">主要目标</p>
-              <p className="text-navy-700 font-medium text-xs">{profile.goals.main_goal}</p>
-            </div>
-            <div className="bg-warm-50 rounded-lg p-3">
-              <p className="text-xs text-warm-500 mb-0.5">目标任务</p>
-              <p className="text-warm-700 text-xs">{profile.goals.target_task}</p>
-            </div>
-            <div className="bg-warm-50 rounded-lg p-3">
-              <p className="text-xs text-warm-500 mb-0.5">应用场景</p>
-              <p className="text-warm-700 text-xs">{profile.goals.application_scene}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Background */}
-        <div className="mb-4">
-          <h4 className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-            <Briefcase size={12} /> 知识背景
-          </h4>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex items-start gap-2">
-              <span className="text-emerald-500 font-medium flex-shrink-0">已掌握</span>
-              <span className="text-warm-600">{profile.background.mastered}</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-blue-500 font-medium flex-shrink-0">较熟悉</span>
-              <span className="text-warm-600">{profile.background.familiar}</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-amber-500 font-medium flex-shrink-0">不熟悉</span>
-              <span className="text-warm-600">{profile.background.unfamiliar}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Preferences */}
-        <div className="mb-4">
-          <h4 className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-            <Lightbulb size={12} /> 学习偏好
-          </h4>
-          <div className="space-y-1.5 text-xs text-warm-600">
-            <p><span className="text-warm-400">讲解风格:</span> {profile.preferences.explanation_style}</p>
-            <p><span className="text-warm-400">示例场景:</span> {profile.preferences.example_scene}</p>
-            <p><span className="text-warm-400">练习形式:</span> {profile.preferences.practice_form}</p>
-          </div>
-        </div>
-
-        {/* Knowledge Transfer */}
-        {profile.knowledge_transfer.length > 0 && (
-          <div>
-            <h4 className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-              <Zap size={12} /> 知识迁移
-            </h4>
-            <div className="space-y-2">
-              {profile.knowledge_transfer.map((kt, i) => (
-                <div key={i} className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
-                  <p className="text-xs font-medium text-emerald-700 mb-1">{kt.new_field}</p>
-                  <p className="text-xs text-emerald-600 mb-1">类比: {kt.analogy}</p>
-                  <p className="text-xs text-warm-500">方法: {kt.method}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Edit profile form */}
-        {editingProfile && (
-          <div className="mt-4 pt-4 border-t border-warm-200 space-y-3">
-            <h4 className="text-xs font-semibold text-navy-600">编辑画像</h4>
-            <div>
-              <label className="text-xs text-warm-500">主要目标</label>
-              <input
-                type="text"
-                value={profile.goals.main_goal}
-                onChange={e => setProfile(prev => ({ ...prev, goals: { ...prev.goals, main_goal: e.target.value } }))}
-                className="w-full px-2 py-1.5 text-xs border border-warm-200 rounded-lg focus:ring-1 focus:ring-navy-500/20 focus:border-navy-500 outline-none mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-warm-500">已掌握知识</label>
-              <input
-                type="text"
-                value={profile.background.mastered}
-                onChange={e => setProfile(prev => ({ ...prev, background: { ...prev.background, mastered: e.target.value } }))}
-                className="w-full px-2 py-1.5 text-xs border border-warm-200 rounded-lg focus:ring-1 focus:ring-navy-500/20 focus:border-navy-500 outline-none mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-warm-500">讲解偏好</label>
-              <input
-                type="text"
-                value={profile.preferences.explanation_style}
-                onChange={e => setProfile(prev => ({ ...prev, preferences: { ...prev.preferences, explanation_style: e.target.value } }))}
-                className="w-full px-2 py-1.5 text-xs border border-warm-200 rounded-lg focus:ring-1 focus:ring-navy-500/20 focus:border-navy-500 outline-none mt-1"
-              />
-            </div>
-            <button
-              onClick={async () => {
-                try {
-                  await lesson.updateProfile(profile.user_id, profile);
-                } catch { /* ignore */ }
-                setEditingProfile(false);
-              }}
-              className="w-full py-2 bg-navy-600 text-white text-xs rounded-lg hover:bg-navy-700 transition font-medium"
-            >
-              保存
-            </button>
-          </div>
+            {rawTexts.map((_, i) => (
+              <option key={i} value={i}>文件 {i + 1}</option>
+            ))}
+          </select>
         )}
       </div>
-    </div>
-  );
-
-  // ============ Render: Default (course list) ============
-  const renderDefaultView = () => (
-    <div className="flex-1 overflow-y-auto animate-fadeIn">
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <h2 className="text-2xl font-bold text-navy-600 mb-2">课程学习</h2>
-        <p className="text-warm-500 mb-8">选择课程开始学习，或创建新的课程</p>
-
-        {selectedCourse ? (
-          <div>
-            <h3 className="text-lg font-semibold text-warm-800 mb-4">{selectedCourse.course_name}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {selectedCourse.outline.units.map((unit, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSelectUnit(idx)}
-                  className="text-left bg-white rounded-xl shadow-card hover:shadow-card-hover border border-warm-100 p-5 transition-all group"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="text-xs text-warm-400">单元 {idx + 1}</span>
-                    <DifficultyBadge difficulty={unit.difficulty} />
-                  </div>
-                  <h4 className="text-base font-semibold text-warm-800 group-hover:text-navy-600 transition mb-2">
-                    {unit.name}
-                  </h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {unit.knowledge_points.map((kp, kpi) => (
-                      <span key={kpi} className="text-xs bg-warm-100 text-warm-600 px-2 py-0.5 rounded-full">
-                        {kp}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <BookOpen size={48} className="text-warm-200 mx-auto mb-4" />
-            <p className="text-warm-400">从左侧选择一个课程，或创建新课程</p>
-          </div>
-        )}
+      <div className="bg-warm-50 rounded-xl border border-warm-200 p-6">
+        <pre className="text-sm text-warm-700 leading-relaxed whitespace-pre-wrap font-sans">
+          {rawTexts[selectedRawFile] || '暂无课件原文'}
+        </pre>
       </div>
     </div>
   );
 
   // ============ Main Render ============
-  return (
-    <div className="flex h-[calc(100vh-4rem)]">
-      {renderLeftPanel()}
-
-      {/* Main content */}
-      {view === 'create' && renderCreateView()}
-      {view === 'lesson' && renderLessonView()}
-      {view === 'exam' && renderExamView()}
-      {view === 'list' && renderDefaultView()}
-
-      {renderRightPanel()}
-    </div>
-  );
+  return step === 'upload' ? renderUploadStep() : renderLearningStep();
 }

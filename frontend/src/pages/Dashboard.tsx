@@ -127,10 +127,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
+      const userId = user?.user_id || '1';
       try {
         const [overviewRes, activitiesRes] = await Promise.all([
-          dashboard.getOverview(),
-          dashboard.getRecentActivities(5),
+          dashboard.getOverview(userId),
+          dashboard.getRecentActivities(userId, 5),
         ]);
         if (overviewRes.success) setOverview(overviewRes.data);
         if (activitiesRes.success) setActivities(activitiesRes.data);
@@ -138,7 +139,7 @@ export default function Dashboard() {
         // Use mock data on error
       }
       try {
-        const statsRes = await study.getStats('week');
+        const statsRes = await study.getStats(userId, 7);
         if (statsRes.success) setStats(statsRes.data);
       } catch {
         // Use mock data on error
@@ -146,7 +147,7 @@ export default function Dashboard() {
       setLoading(false);
     }
     fetchData();
-  }, []);
+  }, [user?.user_id]);
 
   const statCards = [
     { label: '课程数', value: overview.total_courses, icon: <BookOpen className="w-5 h-5" />, color: 'bg-navy-600' },

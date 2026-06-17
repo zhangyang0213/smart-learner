@@ -26,6 +26,8 @@ import { useToastStore } from '@/store/toast';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+// ============ Base Request Helpers ============
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -51,6 +53,36 @@ async function request<T>(
   return response.json();
 }
 
+/** Send form-encoded data (URLSearchParams) for backend Form() params */
+async function formRequest<T>(
+  endpoint: string,
+  data: Record<string, string | number | boolean | undefined>
+): Promise<T> {
+  const url = `${BASE_URL}${endpoint}`;
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined && value !== null) {
+      params.append(key, String(value));
+    }
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    const message = error.detail || `请求失败: ${response.status}`;
+    useToastStore.getState().addToast('error', message);
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+/** Send multipart/form-data for file uploads */
 async function uploadRequest<T>(
   endpoint: string,
   formData: FormData
@@ -69,15 +101,38 @@ async function uploadRequest<T>(
   return response.json();
 }
 
-async function streamChat(
+/** Build a GET URL with query parameters */
+function queryRequest<T>(
+  endpoint: string,
+  params: Record<string, string | number | boolean | undefined> = {}
+): Promise<T> {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, String(value));
+    }
+  }
+  const query = searchParams.toString();
+  return request<T>(`${endpoint}${query ? `?${query}` : ''}`);
+}
+
+/** Stream chat via SSE */
+async function streamFormChat(
   url: string,
-  body: Record<string, unknown>,
+  data: Record<string, string | number | undefined>,
   onChunk: (text: string) => void
 ): Promise<void> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined && value !== null) {
+      params.append(key, String(value));
+    }
+  }
+
   const response = await fetch(`${BASE_URL}${url}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
   });
 
   if (!response.ok) {
@@ -112,7 +167,6 @@ async function streamChat(
             onChunk(parsed.content);
           }
         } catch {
-          // If not JSON, treat as plain text
           onChunk(data);
         }
       }
@@ -122,8 +176,14 @@ async function streamChat(
 
 // ============ Auth ============
 export const auth = {
-  casLogin: () => {
-    window.location.href = `${BASE_URL}/api/auth/cas/login`;
+  casLogin: async (): Promise<string | null> => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/cas/login`);
+      const data = await res.json();
+      return data.login_url || null;
+    } catch {
+      return null;
+    }
   },
 
   casCallback: (ticket: string) =>
@@ -131,227 +191,268 @@ export const auth = {
       `/api/auth/cas/callback?ticket=${encodeURIComponent(ticket)}`
     ),
 
-  getSchedule: () =>
-    request<ApiResponse<ScheduleItem[]>>('/api/auth/schedule'),
+  getSchedule: (userId: string) =>
+    queryRequest<ApiResponse<ScheduleItem[]>>(
+      `/api/auth/schedule/${encodeURIComponent(userId)}`
+    ),
 
-  getProfile: () =>
-    request<ApiResponse<UserProfile>>('/api/auth/profile'),
+  getProfile: (userId: string) =>
+    request<ApiResponse<UserProfile>>(`/api/auth/profile/${encodeURIComponent(userId)}`),
 };
 
 // ============ Course ============
 export const course = {
-  listCourses: () =>
-    request<ApiResponse<Course[]>>('/api/courses'),
+  listCourses: (userId: string) =>
+    queryRequest<ApiResponse<Course[]>>('/api/course/list', { user_id: userId }),
 
-  addCourse: (data: { name: string; code: string; teacher: string; semester: string; description?: string }) =>
-    request<ApiResponse<Course>>('/api/courses', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  addCourse: (data: { name: string; code: string; teacher: string; semester: string; description?: string; user_id: string }) =>
+    formRequest<ApiResponse<Course>>('/api/course/add', data),
 
-  getCourse: (id: string) =>
-    request<ApiResponse<Course>>(`/api/courses/${id}`),
-
-  uploadDocument: (courseId: string, file: File) => {
+  uploadDocument: (courseId: string, file: File, userId: string) => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('course_id', courseId);
+    formData.append('user_id', userId);
     return uploadRequest<ApiResponse<Document>>(
-      `/api/courses/${courseId}/documents`,
+      `/api/course/upload`,
       formData
     );
   },
 
-  listDocuments: (courseId: string) =>
-    request<ApiResponse<Document[]>>(`/api/courses/${courseId}/documents`),
-
-  askQuestion: (courseId: string, question: string) =>
-    request<ApiResponse<ChatMessage>>('/api/courses/ask', {
-      method: 'POST',
-      body: JSON.stringify({ course_id: courseId, question }),
+  askQuestion: (courseId: string, question: string, userId: string) =>
+    formRequest<ApiResponse<ChatMessage>>('/api/course/ask', {
+      course_id: courseId,
+      question,
+      user_id: userId,
     }),
 
-  askStream: (courseId: string, question: string, onChunk: (text: string) => void) =>
-    streamChat('/api/courses/ask/stream', { course_id: courseId, question }, onChunk),
+  askStream: (courseId: string, question: string, userId: string, onChunk: (text: string) => void) =>
+    streamFormChat('/api/course/ask/stream', {
+      course_id: courseId,
+      question,
+      user_id: userId,
+    }, onChunk),
 
-  generateQuiz: (courseId: string, documentId?: string, count: number = 5) =>
-    request<ApiResponse<QuizQuestion[]>>('/api/courses/quiz', {
-      method: 'POST',
-      body: JSON.stringify({ course_id: courseId, document_id: documentId, count }),
+  generateQuiz: (courseId: string, userId: string, documentId?: string, count: number = 5) =>
+    formRequest<ApiResponse<QuizQuestion[]>>('/api/course/quiz/generate', {
+      course_id: courseId,
+      user_id: userId,
+      document_id: documentId,
+      count,
     }),
 };
 
 // ============ Knowledge ============
 export const knowledge = {
-  addKnowledge: (data: { title: string; content: string; category: string; tags?: string[]; source?: string }) =>
-    request<ApiResponse<KnowledgeItem>>('/api/knowledge', {
-      method: 'POST',
-      body: JSON.stringify(data),
+  addKnowledge: (data: { title: string; content: string; category: string; tags?: string; source?: string; user_id: string }) =>
+    formRequest<ApiResponse<KnowledgeItem>>('/api/knowledge/add', data),
+
+  searchKnowledge: (query: string, userId: string, category?: string, limit: number = 10) =>
+    queryRequest<ApiResponse<KnowledgeItem[]>>('/api/knowledge/search', {
+      query,
+      user_id: userId,
+      category,
+      limit,
     }),
 
-  searchKnowledge: (query: string, category?: string, limit: number = 10) =>
-    request<ApiResponse<KnowledgeItem[]>>('/api/knowledge/search', {
-      method: 'POST',
-      body: JSON.stringify({ query, category, limit }),
+  askKnowledge: (question: string, userId: string) =>
+    formRequest<ApiResponse<ChatMessage>>('/api/knowledge/ask', {
+      question,
+      user_id: userId,
     }),
 
-  askKnowledge: (question: string) =>
-    request<ApiResponse<ChatMessage>>('/api/knowledge/ask', {
-      method: 'POST',
-      body: JSON.stringify({ question }),
-    }),
+  listCategories: (userId: string) =>
+    queryRequest<ApiResponse<string[]>>('/api/knowledge/categories', { user_id: userId }),
 
-  askStream: (question: string, onChunk: (text: string) => void) =>
-    streamChat('/api/knowledge/ask/stream', { question }, onChunk),
-
-  listCategories: () =>
-    request<ApiResponse<string[]>>('/api/knowledge/categories'),
-
-  listItems: (params?: { category?: string; page?: number; page_size?: number }) => {
-    const searchParams = new URLSearchParams();
-    if (params?.category) searchParams.set('category', params.category);
-    if (params?.page) searchParams.set('page', String(params.page));
-    if (params?.page_size) searchParams.set('page_size', String(params.page_size));
-    const query = searchParams.toString();
-    return request<PaginatedResponse<KnowledgeItem>>(
-      `/api/knowledge${query ? `?${query}` : ''}`
-    );
+  listItems: (userId: string, params?: { category?: string; page?: number; page_size?: number }) => {
+    const queryParams: Record<string, string | number | undefined> = { user_id: userId };
+    if (params?.category) queryParams.category = params.category;
+    if (params?.page) queryParams.page = params.page;
+    if (params?.page_size) queryParams.page_size = params.page_size;
+    return queryRequest<PaginatedResponse<KnowledgeItem>>('/api/knowledge/items', queryParams);
   },
 
-  archiveItem: (id: string) =>
-    request<ApiResponse<KnowledgeItem>>(`/api/knowledge/${id}/archive`, {
+  archiveItem: (itemId: string) =>
+    request<ApiResponse<KnowledgeItem>>(`/api/knowledge/${itemId}/archive`, {
       method: 'PUT',
     }),
 };
 
 // ============ Paper ============
 export const paper = {
-  analyzePaper: (file: File) => {
+  analyzePaper: (file: File, userId?: string) => {
     const formData = new FormData();
     formData.append('file', file);
-    return uploadRequest<ApiResponse<PaperAnalysis>>('/api/papers/analyze', formData);
+    if (userId) formData.append('user_id', userId);
+    return uploadRequest<ApiResponse<PaperAnalysis>>('/api/paper/analyze', formData);
   },
 
-  summarizePaper: (paperId: string) =>
-    request<ApiResponse<PaperAnalysis>>(`/api/papers/${paperId}/summarize`),
-
-  paperQA: (paperId: string, question: string) =>
-    request<ApiResponse<ChatMessage>>(`/api/papers/${paperId}/qa`, {
-      method: 'POST',
-      body: JSON.stringify({ question }),
+  summarizePaper: (paperId: string, userId?: string) =>
+    formRequest<ApiResponse<PaperAnalysis>>('/api/paper/summarize', {
+      paper_id: paperId,
+      user_id: userId,
     }),
 
-  suggestRelated: (paperId: string) =>
-    request<ApiResponse<PaperAnalysis[]>>(`/api/papers/${paperId}/related`),
+  paperQA: (paperId: string, question: string, userId?: string) =>
+    formRequest<ApiResponse<ChatMessage>>('/api/paper/qa', {
+      paper_id: paperId,
+      question,
+      user_id: userId,
+    }),
+
+  suggestRelated: (paperId: string, userId?: string) =>
+    formRequest<ApiResponse<PaperAnalysis[]>>('/api/paper/suggest-related', {
+      paper_id: paperId,
+      user_id: userId,
+    }),
 };
 
 // ============ Study ============
 export const study = {
-  createPlan: (data: { title: string; goal: string; subject: string; start_date: string; end_date: string }) =>
-    request<ApiResponse<StudyPlan>>('/api/study/plans', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  createPlan: (data: { title: string; goal: string; subject: string; start_date: string; end_date: string; user_id: string }) =>
+    formRequest<ApiResponse<StudyPlan>>('/api/study/plan/create', data),
 
-  listPlans: () =>
-    request<ApiResponse<StudyPlan[]>>('/api/study/plans'),
+  listPlans: (userId: string) =>
+    queryRequest<ApiResponse<StudyPlan[]>>('/api/study/plan/list', { user_id: userId }),
 
-  getPlan: (id: string) =>
-    request<ApiResponse<StudyPlan>>(`/api/study/plans/${id}`),
+  addRecord: (data: { plan_id: string; date: string; duration: number; content: string; notes?: string; mood?: string; user_id: string }) =>
+    formRequest<ApiResponse<StudyRecord>>('/api/study/record', data),
 
-  updatePlan: (id: string, data: Partial<StudyPlan>) =>
-    request<ApiResponse<StudyPlan>>(`/api/study/plans/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
+  getStats: (userId: string, days?: number) =>
+    queryRequest<ApiResponse<StudyStats>>('/api/study/stats', { user_id: userId, days }),
 
-  addRecord: (data: { plan_id: string; date: string; duration: number; content: string; notes?: string; mood?: string }) =>
-    request<ApiResponse<StudyRecord>>('/api/study/records', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  getStats: (period?: 'week' | 'month' | 'year') =>
-    request<ApiResponse<StudyStats>>(`/api/study/stats${period ? `?period=${period}` : ''}`),
-
-  getDailyReport: (date?: string) =>
-    request<ApiResponse<{ date: string; total_hours: number; records: StudyRecord[]; summary: string }>>(
-      `/api/study/daily-report${date ? `?date=${date}` : ''}`
+  getDailyReport: (userId: string) =>
+    queryRequest<ApiResponse<{ date: string; total_hours: number; records: StudyRecord[]; summary: string }>>(
+      '/api/study/daily-report',
+      { user_id: userId }
     ),
 };
 
 // ============ Team ============
 export const team = {
-  createTeam: (data: { name: string; description: string }) =>
-    request<ApiResponse<Team>>('/api/teams', {
-      method: 'POST',
-      body: JSON.stringify(data),
+  createTeam: (data: { name: string; description: string; user_id: string }) =>
+    formRequest<ApiResponse<Team>>('/api/team/create', data),
+
+  joinTeam: (inviteCode: string, userId: string) =>
+    formRequest<ApiResponse<Team>>('/api/team/join', {
+      invite_code: inviteCode,
+      user_id: userId,
     }),
 
-  joinTeam: (inviteCode: string) =>
-    request<ApiResponse<Team>>('/api/teams/join', {
-      method: 'POST',
-      body: JSON.stringify({ invite_code: inviteCode }),
+  listTeams: (userId: string) =>
+    queryRequest<ApiResponse<Team[]>>('/api/team/list', { user_id: userId }),
+
+  addAnnouncement: (teamId: string, data: { title: string; content: string; user_id: string }) =>
+    formRequest<ApiResponse<Team>>('/api/team/announcement', {
+      team_id: teamId,
+      ...data,
     }),
 
-  listTeams: () =>
-    request<ApiResponse<Team[]>>('/api/teams'),
-
-  getTeam: (id: string) =>
-    request<ApiResponse<Team>>(`/api/teams/${id}`),
-
-  addAnnouncement: (teamId: string, data: { title: string; content: string }) =>
-    request<ApiResponse<Team>>(`/api/teams/${teamId}/announcements`, {
-      method: 'POST',
-      body: JSON.stringify(data),
+  addTodo: (teamId: string, data: { title: string; assignee?: string; due_date?: string; user_id: string }) =>
+    formRequest<ApiResponse<Team>>('/api/team/todo', {
+      team_id: teamId,
+      ...data,
     }),
 
-  addTodo: (teamId: string, data: { title: string; assignee?: string; due_date?: string }) =>
-    request<ApiResponse<Team>>(`/api/teams/${teamId}/todos`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  toggleTodo: (teamId: string, todoId: string) =>
-    request<ApiResponse<Team>>(`/api/teams/${teamId}/todos/${todoId}/toggle`, {
+  toggleTodo: (teamId: string, todoIndex: number) =>
+    request<ApiResponse<Team>>(`/api/team/todo/${teamId}/${todoIndex}`, {
       method: 'PUT',
     }),
 };
 
 // ============ Dashboard ============
 export const dashboard = {
-  getOverview: () =>
-    request<ApiResponse<DashboardOverview>>('/api/dashboard/overview'),
+  getOverview: (userId: string) =>
+    queryRequest<ApiResponse<DashboardOverview>>('/api/dashboard/overview', { user_id: userId }),
 
-  getRecentActivities: (limit: number = 10) =>
-    request<ApiResponse<Activity[]>>(`/api/dashboard/activities?limit=${limit}`),
+  getRecentActivities: (userId: string, limit: number = 10) =>
+    queryRequest<ApiResponse<Activity[]>>('/api/dashboard/recent-activities', {
+      user_id: userId,
+      limit,
+    }),
 };
 
 // ============ Lesson ============
 export const lesson = {
   generateOutline: (userId: number, materials: string[], courseName: string) =>
-    request<ApiResponse<LessonOutline>>('/api/lesson/outline', { method: 'POST', body: JSON.stringify({ user_id: userId, materials, course_name: courseName }) }),
+    formRequest<ApiResponse<LessonOutline>>('/api/lesson/outline', {
+      user_id: userId,
+      materials: materials.join('\n'),
+      course_name: courseName,
+    }),
 
   generateLesson: (lessonCourseId: number, unitIndex: number) =>
-    request<ApiResponse<LessonContent>>('/api/lesson/generate', { method: 'POST', body: JSON.stringify({ lesson_course_id: lessonCourseId, unit_index: unitIndex }) }),
+    formRequest<ApiResponse<LessonContent>>('/api/lesson/generate', {
+      lesson_course_id: lessonCourseId,
+      unit_index: unitIndex,
+    }),
 
   submitFeedback: (lessonCourseId: number, unitIndex: number, feedback: any) =>
-    request<ApiResponse<any>>('/api/lesson/feedback', { method: 'POST', body: JSON.stringify({ lesson_course_id: lessonCourseId, unit_index: unitIndex, feedback }) }),
+    formRequest<ApiResponse<any>>('/api/lesson/feedback', {
+      lesson_course_id: lessonCourseId,
+      unit_index: unitIndex,
+      feedback: JSON.stringify(feedback),
+    }),
 
   evaluateMastery: (lessonCourseId: number, unitIndex: number, feedback: any) =>
-    request<ApiResponse<MasteryEvaluation>>('/api/lesson/evaluate', { method: 'POST', body: JSON.stringify({ lesson_course_id: lessonCourseId, unit_index: unitIndex, feedback }) }),
+    formRequest<ApiResponse<MasteryEvaluation>>('/api/lesson/evaluate', {
+      lesson_course_id: lessonCourseId,
+      unit_index: unitIndex,
+      feedback: JSON.stringify(feedback),
+    }),
 
   generateExam: (lessonCourseId: number, examType: string = 'final') =>
-    request<ApiResponse<ExamRecord>>('/api/lesson/exam', { method: 'POST', body: JSON.stringify({ lesson_course_id: lessonCourseId, exam_type: examType }) }),
+    formRequest<ApiResponse<ExamRecord>>('/api/lesson/exam', {
+      lesson_course_id: lessonCourseId,
+      exam_type: examType,
+    }),
 
   gradeExam: (examId: number, userAnswers: Record<string, string>) =>
-    request<ApiResponse<ExamRecord>>('/api/lesson/grade', { method: 'POST', body: JSON.stringify({ exam_id: examId, user_answers: userAnswers }) }),
+    formRequest<ApiResponse<ExamRecord>>('/api/lesson/grade', {
+      exam_id: examId,
+      user_answers: JSON.stringify(userAnswers),
+    }),
 
   generateConsolidation: (examId: number) =>
-    request<ApiResponse<ExamRecord>>('/api/lesson/consolidation', { method: 'POST', body: JSON.stringify({ exam_id: examId }) }),
+    formRequest<ApiResponse<ExamRecord>>('/api/lesson/consolidation', {
+      exam_id: examId,
+    }),
 
   getProfile: (userId: number) =>
     request<ApiResponse<LearnerProfile>>(`/api/lesson/profile/${userId}`),
 
-  updateProfile: (userId: number, profile: any) =>
-    request<ApiResponse<LearnerProfile>>(`/api/lesson/profile/${userId}`, { method: 'PUT', body: JSON.stringify(profile) }),
+  updateProfile: (userId: number, profile: any) => {
+    const params = new URLSearchParams();
+    // Flatten profile object for form encoding
+    const flatProfile: Record<string, string> = {};
+    for (const [key, value] of Object.entries(profile)) {
+      if (typeof value === 'object' && value !== null) {
+        flatProfile[key] = JSON.stringify(value);
+      } else {
+        flatProfile[key] = String(value);
+      }
+    }
+    for (const [key, value] of Object.entries(flatProfile)) {
+      params.append(key, value);
+    }
+    return request<ApiResponse<LearnerProfile>>(`/api/lesson/profile/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+  },
+
+  uploadAndLearn: (userId: string, courseName: string, files: File[]) => {
+    const formData = new FormData();
+    formData.append('course_name', courseName);
+    formData.append('user_id', userId);
+    files.forEach(f => formData.append('files', f));
+    return uploadRequest<any>('/api/lesson/upload-and-learn', formData);
+  },
+
+  chatAboutCourse: (lessonCourseId: number, question: string, userId: string) =>
+    formRequest<any>('/api/lesson/chat', { lesson_course_id: String(lessonCourseId), question, user_id: userId }),
+
+  chatAboutCourseStream: (lessonCourseId: number, question: string, userId: string, onChunk: (text: string) => void) =>
+    streamFormChat('/api/lesson/chat/stream', { lesson_course_id: String(lessonCourseId), question, user_id: userId }, onChunk),
 };

@@ -11,6 +11,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { knowledge } from '@/services/api';
+import { useAppStore } from '@/store';
 import ChatDialog from '@/components/ChatDialog';
 import type { KnowledgeItem, ChatMessage } from '@/types';
 
@@ -40,6 +41,8 @@ const mockItems: KnowledgeItem[] = [
 ];
 
 export default function Knowledge() {
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
   const [categories, setCategories] = useState<string[]>(mockCategories);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,21 +69,21 @@ export default function Knowledge() {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await knowledge.listCategories();
+        const res = await knowledge.listCategories(userId);
         if (res.success && res.data.length > 0) setCategories(res.data);
       } catch {
         // Use mock data
       }
     }
     fetchCategories();
-  }, []);
+  }, [userId]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
     setHasSearched(true);
     try {
-      const res = await knowledge.searchKnowledge(searchQuery, selectedCategory || undefined);
+      const res = await knowledge.searchKnowledge(searchQuery, userId, selectedCategory || undefined);
       if (res.success) setSearchResults(res.data);
     } catch {
       // Filter mock data
@@ -112,7 +115,8 @@ export default function Knowledge() {
         content: addForm.content,
         category: addForm.category,
         source: addForm.source || undefined,
-        tags: tags.length > 0 ? tags : undefined,
+        tags: tags.length > 0 ? tags.join(',') : undefined,
+        user_id: userId,
       });
       if (res.success) {
         setSearchResults((prev) => [res.data, ...prev]);
@@ -149,7 +153,7 @@ export default function Knowledge() {
     setQaMessages((prev) => [...prev, userMsg]);
     setQaLoading(true);
     try {
-      const res = await knowledge.askKnowledge(question);
+      const res = await knowledge.askKnowledge(question, userId);
       if (res.success) {
         setQaMessages((prev) => [...prev, res.data]);
       }

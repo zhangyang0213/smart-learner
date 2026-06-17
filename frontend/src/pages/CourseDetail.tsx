@@ -70,6 +70,8 @@ function QATab({ courseId }: { courseId: string }) {
   const [streaming, setStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const addMessage = useAppStore((s) => s.addMessage);
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -102,7 +104,7 @@ function QATab({ courseId }: { courseId: string }) {
     setMessages((prev) => [...prev, assistantMsg]);
 
     try {
-      await courseApi.askStream(courseId, question, (chunk) => {
+      await courseApi.askStream(courseId, question, userId, (chunk) => {
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantId
@@ -114,7 +116,7 @@ function QATab({ courseId }: { courseId: string }) {
     } catch {
       // If streaming fails, fall back to non-streaming API
       try {
-        const res = await courseApi.askQuestion(courseId, question);
+        const res = await courseApi.askQuestion(courseId, question, userId);
         if (res.success) {
           setMessages((prev) =>
             prev.map((msg) =>
@@ -244,17 +246,11 @@ function DocsTab({ courseId }: { courseId: string }) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
 
   useEffect(() => {
-    async function fetchDocs() {
-      try {
-        const res = await courseApi.listDocuments(courseId);
-        if (res.success) setDocuments(res.data);
-      } catch {
-        // Use mock data
-      }
-    }
-    fetchDocs();
+    // No backend endpoint for listing documents; use mock data
   }, [courseId]);
 
   const handleUpload = async (files: FileList | null) => {
@@ -262,7 +258,7 @@ function DocsTab({ courseId }: { courseId: string }) {
     setUploading(true);
     try {
       for (let i = 0; i < files.length; i++) {
-        const res = await courseApi.uploadDocument(courseId, files[i]);
+        const res = await courseApi.uploadDocument(courseId, files[i], userId);
         if (res.success) {
           setDocuments((prev) => [...prev, res.data]);
         }
@@ -350,6 +346,8 @@ function QuizTab({ courseId }: { courseId: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [expandedExplanations, setExpandedExplanations] = useState<Set<string>>(new Set());
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
 
   const generateQuiz = async () => {
     setLoading(true);
@@ -357,7 +355,7 @@ function QuizTab({ courseId }: { courseId: string }) {
     setSelectedAnswers({});
     setExpandedExplanations(new Set());
     try {
-      const res = await courseApi.generateQuiz(courseId, undefined, 5);
+      const res = await courseApi.generateQuiz(courseId, userId, undefined, 5);
       if (res.success) setQuestions(res.data);
     } catch {
       setQuestions(mockQuizQuestions);
@@ -518,17 +516,8 @@ export default function CourseDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchCourse() {
-      if (!id) return;
-      try {
-        const res = await courseApi.getCourse(id);
-        if (res.success) setCourse(res.data);
-      } catch {
-        // Use mock data
-      }
-      setLoading(false);
-    }
-    fetchCourse();
+    // No backend endpoint for getting a single course; use mock data
+    setLoading(false);
   }, [id]);
 
   const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [

@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { study } from '@/services/api';
+import { useAppStore } from '@/store';
 import type { StudyPlan, StudyRecord, StudyStats } from '@/types';
 
 const mockPlans: StudyPlan[] = [
@@ -54,6 +55,8 @@ const mockStats: StudyStats = {
 };
 
 export default function Study() {
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
   const [plans, setPlans] = useState<StudyPlan[]>(mockPlans);
   const [stats, setStats] = useState<StudyStats>(mockStats);
   const [loading, setLoading] = useState(true);
@@ -79,8 +82,8 @@ export default function Study() {
     async function fetchData() {
       try {
         const [plansRes, statsRes] = await Promise.all([
-          study.listPlans(),
-          study.getStats('week'),
+          study.listPlans(userId),
+          study.getStats(userId, 7),
         ]);
         if (plansRes.success) setPlans(plansRes.data);
         if (statsRes.success) setStats(statsRes.data);
@@ -90,13 +93,13 @@ export default function Study() {
       setLoading(false);
     }
     fetchData();
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     async function fetchReport() {
       setReportLoading(true);
       try {
-        const res = await study.getDailyReport();
+        const res = await study.getDailyReport(userId);
         if (res.success) setDailyReport(res.data);
       } catch {
         setDailyReport({
@@ -115,7 +118,7 @@ export default function Study() {
     if (!planForm.title || !planForm.goal || !planForm.subject || !planForm.start_date || !planForm.end_date) return;
     setCreating(true);
     try {
-      const res = await study.createPlan(planForm);
+      const res = await study.createPlan({ ...planForm, user_id: userId });
       if (res.success) {
         setPlans((prev) => [...prev, res.data]);
         setShowCreateForm(false);
@@ -147,10 +150,9 @@ export default function Study() {
     setAddingRecord(true);
     try {
       await study.addRecord({
-        plan_id: recordForm.plan_id,
-        date: recordForm.date,
+        ...recordForm,
         duration: Number(recordForm.duration),
-        content: recordForm.content,
+        user_id: userId,
       });
     } catch {
       // Silently fail

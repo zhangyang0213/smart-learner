@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+import json
+import os
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -285,3 +290,115 @@ async def update_learner_profile(user_id: int, req: ProfileUpdateRequest,
             "knowledge_transfer": profile.knowledge_transfer or [],
         }
     }
+
+
+@router.post("/upload-and-learn")
+async def upload_and_learn(
+    files: list[UploadFile] = File(...),
+    course_name: str = Form(...),
+    user_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传多个课件文件，解析内容，索引到向量库，生成课程脉络"""
+    from app.services.file_parser import FileParser
+    from app.services.rag_engine import rag_engine
+
+    # Ensure uploads directory exists
+    os.makedirs("uploads", exist_ok=True)
+
+    all_text = []
+    file_records = []
+
+    for file in files:
+        # Save file
+        file_ext = os.path.splitext(file.filename)[1] if file.filename else ""
+        file_name = f"{uuid.uuid4()}{file_ext}"
+        file_path = os.path.join("uploads", file_name)
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        # Parse file
+        try:
+            text = await FileParser.parse_file(file_path)
+            if text:
+                all_text.append(text)
+                file_records.append({"name": file.filename, "size": len(content), "status": "parsed", "chars": len(text)})
+            else:
+                file_records.append({"name": file.filename, "size": len(content), "status": "empty"})
+        except Exception as e:
+            file_records.append({"name": file.filename, "size": len(content), "status": "failed", "error": str(e)})
+
+    if not all_text:
+        return {"error": "No text could be extracted from the uploaded files", "files": file_records}
+
+    # Combine all text
+    combined_text = "\n\n---\n\n".join(all_text)
+
+    # Index to vector database
+    try:
+        vector_ids = await rag_engine.index_document(
+            text=combined_text,
+            user_id=user_id,
+            source=course_name,
+            doc_type="course_material",
+            title=course_name,
+        )
+    except Exception:
+        vector_ids = []
+
+    # Generate course outline using ko-lesson methodology
+    outline = await lesson_service.generate_course_outline(
+        materials=all_text,
+        course_name=course_name,
+        user_id=user_id,
+    )
+
+    # Save to database
+    lesson_course = LessonCourse(
+        user_id=user_id,
+        course_name=course_name,
+        outline=outline,
+        status="active",
+    )
+    db.add(lesson_course)
+    await db.commit()
+    await db.refresh(lesson_course)
+
+    return {
+        "lesson_course_id": lesson_course.id,
+        "course_name": course_name,
+        "files": file_records,
+        "total_chars": len(combined_text),
+        "vector_count": len(vector_ids),
+        "outline": outline,
+    }
+
+
+@router.post("/chat")
+async def chat_about_course(
+    lesson_course_id: int = Form(...),
+    question: str = Form(...),
+    user_id: int = Form(...),
+):
+    """基于课程材料的RAG问答"""
+    from app.services.rag_engine import rag_engine
+    result = await rag_engine.query_course(question, user_id, course_id=lesson_course_id)
+    return result
+
+
+@router.post("/chat/stream")
+async def chat_about_course_stream(
+    lesson_course_id: int = Form(...),
+    question: str = Form(...),
+    user_id: int = Form(...),
+):
+    """基于课程材料的RAG流式问答"""
+    from app.services.rag_engine import rag_engine
+
+    async def generate():
+        async for chunk in rag_engine.query_course_stream(question, user_id, course_id=lesson_course_id):
+            yield f"data: {json.dumps({'content': chunk})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")

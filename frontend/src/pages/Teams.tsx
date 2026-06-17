@@ -16,6 +16,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { team } from '@/services/api';
+import { useAppStore } from '@/store';
 import type { Team, TeamMember } from '@/types';
 
 const mockTeams: Team[] = [
@@ -66,6 +67,8 @@ const roleBadge = (role: TeamMember['role']) => {
 };
 
 export default function Teams() {
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
   const [teams, setTeams] = useState<Team[]>(mockTeams);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +98,7 @@ export default function Teams() {
   useEffect(() => {
     async function fetchTeams() {
       try {
-        const res = await team.listTeams();
+        const res = await team.listTeams(userId);
         if (res.success) setTeams(res.data);
       } catch {
         // Use mock data
@@ -103,13 +106,13 @@ export default function Teams() {
       setLoading(false);
     }
     fetchTeams();
-  }, []);
+  }, [userId]);
 
   const handleCreateTeam = async () => {
     if (!createForm.name) return;
     setCreating(true);
     try {
-      const res = await team.createTeam(createForm);
+      const res = await team.createTeam({ ...createForm, user_id: userId });
       if (res.success) {
         setTeams((prev) => [...prev, res.data]);
         setShowCreateModal(false);
@@ -137,7 +140,7 @@ export default function Teams() {
     if (!joinCode.trim()) return;
     setJoining(true);
     try {
-      const res = await team.joinTeam(joinCode.trim());
+      const res = await team.joinTeam(joinCode.trim(), userId);
       if (res.success) {
         setTeams((prev) => [...prev, res.data]);
         setShowJoinModal(false);
@@ -153,7 +156,7 @@ export default function Teams() {
     if (!selectedTeam || !announcementForm.title || !announcementForm.content) return;
     setPostingAnnouncement(true);
     try {
-      const res = await team.addAnnouncement(selectedTeam.id, announcementForm);
+      const res = await team.addAnnouncement(selectedTeam.id, { ...announcementForm, user_id: userId });
       if (res.success) {
         setSelectedTeam(res.data);
         setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? res.data : t)));
@@ -186,6 +189,7 @@ export default function Teams() {
         title: todoForm.title,
         assignee: todoForm.assignee || undefined,
         due_date: todoForm.due_date || undefined,
+        user_id: userId,
       });
       if (res.success) {
         setSelectedTeam(res.data);
@@ -212,17 +216,17 @@ export default function Teams() {
     setAddingTodo(false);
   };
 
-  const handleToggleTodo = async (todoId: string) => {
+  const handleToggleTodo = async (todoIndex: number) => {
     if (!selectedTeam) return;
     try {
-      const res = await team.toggleTodo(selectedTeam.id, todoId);
+      const res = await team.toggleTodo(selectedTeam.id, todoIndex);
       if (res.success) {
         setSelectedTeam(res.data);
         setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? res.data : t)));
       }
     } catch {
-      const updatedTodos = selectedTeam.todos.map((t) =>
-        t.id === todoId ? { ...t, completed: !t.completed } : t
+      const updatedTodos = selectedTeam.todos.map((t, i) =>
+        i === todoIndex ? { ...t, completed: !t.completed } : t
       );
       const updatedTeam = { ...selectedTeam, todos: updatedTodos };
       setSelectedTeam(updatedTeam);
@@ -420,13 +424,13 @@ export default function Teams() {
                     <p className="text-warm-400 text-sm text-center py-4">暂无待办事项</p>
                   ) : (
                     <div className="space-y-2">
-                      {selectedTeam.todos.map((todo) => (
+                      {selectedTeam.todos.map((todo, todoIdx) => (
                         <div
                           key={todo.id}
                           className="flex items-center gap-3 p-3 rounded-lg hover:bg-warm-50 transition-colors"
                         >
                           <button
-                            onClick={() => handleToggleTodo(todo.id)}
+                            onClick={() => handleToggleTodo(todoIdx)}
                             className="flex-shrink-0"
                           >
                             {todo.completed ? (

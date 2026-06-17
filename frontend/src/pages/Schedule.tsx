@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { auth } from '@/services/api';
+import { useAppStore } from '@/store';
 import type { ScheduleItem } from '@/types';
 
 const mockSchedule: ScheduleItem[] = [
@@ -56,13 +57,15 @@ function sectionSpan(start: string, end: string): number {
 }
 
 export default function Schedule() {
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
   const [schedule, setSchedule] = useState<ScheduleItem[]>(mockSchedule);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchSchedule() {
       try {
-        const res = await auth.getSchedule();
+        const res = await auth.getSchedule(userId);
         if (res.success) setSchedule(res.data);
       } catch {
         // Use mock data
@@ -70,7 +73,7 @@ export default function Schedule() {
       setLoading(false);
     }
     fetchSchedule();
-  }, []);
+  }, [userId]);
 
   // Get current day of week (1=Monday, 7=Sunday)
   const today = new Date().getDay();

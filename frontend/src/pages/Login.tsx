@@ -32,8 +32,16 @@ export default function Login() {
   const setUser = useAppStore((s) => s.setUser);
   const [loading, setLoading] = useState(false);
 
-  const handleCasLogin = () => {
-    auth.casLogin();
+  const handleCasLogin = async () => {
+    try {
+      const loginUrl = await auth.casLogin();
+      if (loginUrl) {
+        window.location.href = loginUrl;
+      }
+    } catch {
+      // If CAS is not available, fall back to demo login
+      handleDemoLogin();
+    }
   };
 
   const handleDemoLogin = () => {
