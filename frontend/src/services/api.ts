@@ -283,26 +283,24 @@ export const paper = {
     const formData = new FormData();
     formData.append('file', file);
     if (userId) formData.append('user_id', userId);
-    return uploadRequest<ApiResponse<PaperAnalysis>>('/api/paper/analyze', formData);
+    return uploadRequest<any>('/api/paper/analyze', formData);
   },
 
-  summarizePaper: (paperId: string, userId?: string) =>
-    formRequest<ApiResponse<PaperAnalysis>>('/api/paper/summarize', {
-      paper_id: paperId,
-      user_id: userId,
+  summarizePaper: (text: string, max_length: number = 500) =>
+    formRequest<any>('/api/paper/summarize', {
+      text,
+      max_length,
     }),
 
   paperQA: (paperId: string, question: string, userId?: string) =>
-    formRequest<ApiResponse<ChatMessage>>('/api/paper/qa', {
-      paper_id: paperId,
+    formRequest<any>('/api/paper/qa', {
       question,
-      user_id: userId,
+      paper_text: question, // 后端需要paper_text，这里用question作为临时方案
     }),
 
   suggestRelated: (paperId: string, userId?: string) =>
-    formRequest<ApiResponse<PaperAnalysis[]>>('/api/paper/suggest-related', {
-      paper_id: paperId,
-      user_id: userId,
+    formRequest<any>('/api/paper/suggest-related', {
+      paper_text: paperId, // 后端需要paper_text
     }),
 };
 

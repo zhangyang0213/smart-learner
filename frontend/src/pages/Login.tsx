@@ -35,12 +35,20 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await auth.register(form.studentId, form.name, form.college, form.major, form.grade);
-      if (res.success && res.data.user) {
-        const user = res.data.user;
-        setUser(user);
-        setUserId(user.user_id);
-        setStep(2);
-      }
+      // 后端直接返回用户数据，没有success包装
+      const userData = (res as any)?.data?.user || (res as any)?.user || res;
+      const user = {
+        user_id: String(userData.user_id || userData.id || `local-${form.studentId}`),
+        name: userData.name || form.name,
+        student_id: userData.student_id || form.studentId,
+        college: userData.college || form.college,
+        major: userData.major || form.major,
+        grade: userData.grade || form.grade,
+        created_at: new Date().toISOString(),
+      };
+      setUser(user);
+      setUserId(user.user_id);
+      setStep(2);
     } catch {
       // Fallback: create local user and proceed
       const fallbackUser = {

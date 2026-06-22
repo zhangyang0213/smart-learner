@@ -34,14 +34,14 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { path: '/lesson', label: '课程学习', icon: <BookMarked size={20} /> },
+  { path: '/schedule', label: '课程表', icon: <Calendar size={20} /> },
   { path: '/dashboard', label: '学习概览', icon: <LayoutDashboard size={20} /> },
   { path: '/courses', label: '我的课程', icon: <BookOpen size={20} /> },
   { path: '/papers', label: '论文分析', icon: <FileText size={20} /> },
-  { path: '/knowledge', label: '知识库', icon: <Brain size={20} /> },
   { path: '/study', label: '学习计划', icon: <GraduationCap size={20} /> },
-  { path: '/lesson', label: '课程学习', icon: <BookMarked size={20} /> },
+  { path: '/knowledge', label: '知识库', icon: <Brain size={20} /> },
   { path: '/teams', label: '学习小组', icon: <Users size={20} /> },
-  { path: '/schedule', label: '课程表', icon: <Calendar size={20} /> },
 ];
 
 // ============ Layout Component ============

@@ -1,25 +1,37 @@
 from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import os
+import uuid
 
 from app.database.connection import get_db
 from app.models.models import Document
 from app.services.llm_service import llm_service
+from app.services.file_parser import FileParser
 
 router = APIRouter(prefix="/api/paper", tags=["论文精读"])
 
 
 @router.post("/analyze")
 async def analyze_paper(
-    user_id: int = Form(...),
     file: UploadFile = File(default=None),
     text: str = Form(default=""),
+    user_id: int = Form(default=1),
 ):
     """论文深度分析"""
     paper_text = text
     if file:
+        # 保存文件并用FileParser解析（支持PDF/DOCX/TXT等）
+        file_ext = os.path.splitext(file.filename)[1]
+        file_name = f"paper_{uuid.uuid4().hex[:8]}{file_ext}"
+        file_path = os.path.join("uploads", file_name)
         content = await file.read()
-        paper_text = content.decode("utf-8", errors="ignore")
+        with open(file_path, "wb") as f:
+            f.write(content)
+        try:
+            paper_text = await FileParser.parse_file(file_path)
+        except Exception:
+            paper_text = content.decode("utf-8", errors="ignore")
 
     if not paper_text:
         raise HTTPException(status_code=400, detail="请提供论文文本或上传文件")

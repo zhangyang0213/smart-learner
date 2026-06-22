@@ -69,16 +69,15 @@ export default function Papers() {
   const [relatedLoading, setRelatedLoading] = useState(false);
 
   const handleFileUpload = useCallback(async (file: File) => {
-    if (!file.name.endsWith('.pdf')) return;
     setUploading(true);
     try {
       const res = await paper.analyzePaper(file, userId);
-      if (res.success) {
-        setAnalysis(res.data);
-        // Auto-estimate difficulty
+      const analysisData = (res as any)?.analysis || (res as any)?.data || res;
+      if (analysisData) {
+        setAnalysis(analysisData);
         setAnalyzingDifficulty(true);
         setTimeout(() => {
-          setDifficulty(Math.floor(Math.random() * 3) + 3);
+          setDifficulty(analysisData.reading_difficulty || Math.floor(Math.random() * 3) + 3);
           setAnalyzingDifficulty(false);
         }, 800);
       }
@@ -88,7 +87,7 @@ export default function Papers() {
       setDifficulty(4);
     }
     setUploading(false);
-  }, []);
+  }, [userId]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -118,9 +117,10 @@ export default function Papers() {
       const blob = new Blob([pastedText], { type: 'text/plain' });
       const file = new File([blob], 'pasted-text.txt', { type: 'text/plain' });
       const res = await paper.analyzePaper(file, userId);
-      if (res.success) {
-        setAnalysis(res.data);
-        setDifficulty(Math.floor(Math.random() * 3) + 2);
+      const analysisData = (res as any)?.analysis || (res as any)?.data || res;
+      if (analysisData) {
+        setAnalysis(analysisData);
+        setDifficulty(analysisData.reading_difficulty || Math.floor(Math.random() * 3) + 2);
       }
     } catch {
       setAnalysis(mockAnalysis);
@@ -134,7 +134,7 @@ export default function Papers() {
     if (!analysis) return;
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
-      session_id: analysis.id,
+      session_id: analysis.id || 'paper-session',
       role: 'user',
       content: question,
       timestamp: new Date().toISOString(),
@@ -142,14 +142,20 @@ export default function Papers() {
     setQaMessages((prev) => [...prev, userMsg]);
     setQaLoading(true);
     try {
-      const res = await paper.paperQA(analysis.id, question, userId);
-      if (res.success) {
-        setQaMessages((prev) => [...prev, res.data]);
-      }
+      const res = await paper.paperQA(analysis.id || '1', question, userId);
+      const answer = (res as any)?.answer || (res as any)?.data?.content || '分析完成，但无法获取详细回答。';
+      const assistantMsg: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        session_id: analysis.id || 'paper-session',
+        role: 'assistant',
+        content: answer,
+        timestamp: new Date().toISOString(),
+      };
+      setQaMessages((prev) => [...prev, assistantMsg]);
     } catch {
       const assistantMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
-        session_id: analysis.id,
+        session_id: analysis.id || 'paper-session',
         role: 'assistant',
         content: '抱歉，暂时无法回答这个问题，请稍后再试。',
         timestamp: new Date().toISOString(),
@@ -163,8 +169,9 @@ export default function Papers() {
     if (!analysis) return;
     setRelatedLoading(true);
     try {
-      const res = await paper.suggestRelated(analysis.id, userId);
-      if (res.success) setRelatedPapers(res.data);
+      const res = await paper.suggestRelated(analysis.id || '1', userId);
+      const data = (res as any)?.related_topics ? res : (res as any)?.data || [];
+      setRelatedPapers(Array.isArray(data) ? data : [data]);
     } catch {
       setRelatedPapers([]);
     }
