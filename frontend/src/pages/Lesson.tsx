@@ -354,24 +354,31 @@ export default function Lesson() {
     try {
       if (lessonCourseId) {
         const res = await lesson.generateLesson(lessonCourseId, unitIndex);
-        if (res.success && res.data) {
-          setLessonContent(res.data);
+        const data = (res as any)?.lesson || (res as any)?.data || res;
+        if (data && data.sections) {
+          setLessonContent(data);
           setLessonLoading(false);
           return;
         }
       }
     } catch { /* fallback */ }
 
-    // Mock fallback
-    setTimeout(() => {
-      const unit = outline?.units[unitIndex];
-      setLessonContent({
-        ...mockLessonContent,
-        title: unit?.name || mockLessonContent.title,
-        knowledge_points: unit?.knowledge_points || mockLessonContent.knowledge_points,
-      });
-      setLessonLoading(false);
-    }, 600);
+    // Only use mock as last resort, and make it unit-specific
+    const unit = outline?.units[unitIndex];
+    setLessonContent({
+      title: unit?.name || '课程内容',
+      objectives: unit?.knowledge_points || ['理解核心概念'],
+      knowledge_points: unit?.knowledge_points || [],
+      sections: [
+        { type: 'life_intro', title: '生活引入', content: `关于${unit?.name || '本课'}，想象一下你在日常生活中遇到的相关场景...` },
+        { type: 'formal', title: '正式讲解', content: `本节核心知识点：${(unit?.knowledge_points || []).join('、')}。请通过课程对话获取详细讲解。` },
+        { type: 'deep_dive', title: '深挖理解', content: '请通过课程对话深入探讨相关概念。' },
+        { type: 'application', title: '实际应用', content: '请通过课程对话了解实际应用场景。' },
+      ],
+      quick_check: [],
+      feedback_entry: { can_retell: '', stuck_at: '', difficulty: 3, next_step: 'continue' },
+    });
+    setLessonLoading(false);
   }, [lessonCourseId, outline]);
 
   // ============ Quiz ============
@@ -385,18 +392,30 @@ export default function Lesson() {
     try {
       if (lessonCourseId) {
         const res = await lesson.generateExam(lessonCourseId);
-        if (res.success && res.data && res.data.questions?.length > 0) {
-          setQuizQuestions(res.data.questions);
+        const data = (res as any)?.exam || (res as any)?.data || res;
+        if (data?.questions?.length > 0) {
+          setQuizQuestions(data.questions);
           setQuizLoading(false);
           return;
         }
       }
     } catch { /* fallback */ }
 
-    setTimeout(() => {
-      setQuizQuestions(mockQuizQuestions);
-      setQuizLoading(false);
-    }, 500);
+    // Mock fallback - generate from current unit's knowledge points
+    const unit = outline?.units[currentUnitIndex];
+    if (unit) {
+      const mockQs = unit.knowledge_points.map((kp, i) => ({
+        type: 'single_choice',
+        knowledge_point: kp,
+        question: `关于${kp}，以下哪个说法是正确的？`,
+        options: [`${kp}是核心概念`, `${kp}不重要`, `${kp}已被淘汰`, `${kp}仅适用于理论`],
+        answer: 'A',
+        explanation: `${kp}是${unit.name}的核心概念之一。`,
+        source: unit.name,
+      }));
+      setQuizQuestions(mockQs);
+    }
+    setQuizLoading(false);
   };
 
   const handleSubmitQuiz = async () => {
@@ -422,17 +441,18 @@ export default function Lesson() {
     try {
       if (lessonCourseId) {
         const res = await lesson.evaluateMastery(lessonCourseId, currentUnitIndex, feedbackForm);
-        if (res.success && res.data) {
-          setMastery(res.data);
+        const data = (res as any)?.evaluation || (res as any)?.data || res;
+        if (data?.mastery_level) {
+          setMastery(data);
           return;
         }
       }
     } catch { /* fallback */ }
     setMastery({
-      mastery_level: '能听懂',
-      analysis: '学习者对基本概念有初步理解，但尚不能独立复述核心定义，需要更多练习和巩固。',
-      next_action: 'add_practice',
-      need_reinforce: true,
+      mastery_level: feedbackForm.difficulty <= 2 ? '能复述' : feedbackForm.difficulty <= 3 ? '能听懂' : '未接触',
+      analysis: `根据你的反馈，你对本单元内容${feedbackForm.stuck_at ? '在' + feedbackForm.stuck_at + '方面还有困惑' : '有基本了解'}。`,
+      next_action: feedbackForm.difficulty >= 4 ? 'supplement' : 'continue',
+      need_reinforce: feedbackForm.difficulty >= 4,
     });
   };
 

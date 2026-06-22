@@ -371,74 +371,6 @@ export const dashboard = {
 
 // ============ Lesson ============
 export const lesson = {
-  generateOutline: (userId: number, materials: string[], courseName: string) =>
-    formRequest<ApiResponse<LessonOutline>>('/api/lesson/outline', {
-      user_id: userId,
-      materials: materials.join('\n'),
-      course_name: courseName,
-    }),
-
-  generateLesson: (lessonCourseId: number, unitIndex: number) =>
-    formRequest<ApiResponse<LessonContent>>('/api/lesson/generate', {
-      lesson_course_id: lessonCourseId,
-      unit_index: unitIndex,
-    }),
-
-  submitFeedback: (lessonCourseId: number, unitIndex: number, feedback: any) =>
-    formRequest<ApiResponse<any>>('/api/lesson/feedback', {
-      lesson_course_id: lessonCourseId,
-      unit_index: unitIndex,
-      feedback: JSON.stringify(feedback),
-    }),
-
-  evaluateMastery: (lessonCourseId: number, unitIndex: number, feedback: any) =>
-    formRequest<ApiResponse<MasteryEvaluation>>('/api/lesson/evaluate', {
-      lesson_course_id: lessonCourseId,
-      unit_index: unitIndex,
-      feedback: JSON.stringify(feedback),
-    }),
-
-  generateExam: (lessonCourseId: number, examType: string = 'final') =>
-    formRequest<ApiResponse<ExamRecord>>('/api/lesson/exam', {
-      lesson_course_id: lessonCourseId,
-      exam_type: examType,
-    }),
-
-  gradeExam: (examId: number, userAnswers: Record<string, string>) =>
-    formRequest<ApiResponse<ExamRecord>>('/api/lesson/grade', {
-      exam_id: examId,
-      user_answers: JSON.stringify(userAnswers),
-    }),
-
-  generateConsolidation: (examId: number) =>
-    formRequest<ApiResponse<ExamRecord>>('/api/lesson/consolidation', {
-      exam_id: examId,
-    }),
-
-  getProfile: (userId: number) =>
-    request<ApiResponse<LearnerProfile>>(`/api/lesson/profile/${userId}`),
-
-  updateProfile: (userId: number, profile: any) => {
-    const params = new URLSearchParams();
-    // Flatten profile object for form encoding
-    const flatProfile: Record<string, string> = {};
-    for (const [key, value] of Object.entries(profile)) {
-      if (typeof value === 'object' && value !== null) {
-        flatProfile[key] = JSON.stringify(value);
-      } else {
-        flatProfile[key] = String(value);
-      }
-    }
-    for (const [key, value] of Object.entries(flatProfile)) {
-      params.append(key, value);
-    }
-    return request<ApiResponse<LearnerProfile>>(`/api/lesson/profile/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
-    });
-  },
-
   uploadAndLearn: (userId: string, courseName: string, files: File[]) => {
     const formData = new FormData();
     formData.append('course_name', courseName);
@@ -447,9 +379,56 @@ export const lesson = {
     return uploadRequest<any>('/api/lesson/upload-and-learn', formData);
   },
 
+  generateLesson: (lessonCourseId: number, unitIndex: number) =>
+    formRequest<any>('/api/lesson/generate', {
+      lesson_course_id: String(lessonCourseId),
+      unit_index: String(unitIndex),
+    }),
+
+  generateExam: (lessonCourseId: number, examType: string = 'final') =>
+    formRequest<any>('/api/lesson/exam', {
+      lesson_course_id: String(lessonCourseId),
+      exam_type: examType,
+    }),
+
+  evaluateMastery: (lessonCourseId: number, unitIndex: number, feedback: any) =>
+    formRequest<any>('/api/lesson/evaluate', {
+      lesson_course_id: String(lessonCourseId),
+      unit_index: String(unitIndex),
+      can_retell: feedback.can_retell || '',
+      stuck_at: feedback.stuck_at || '',
+      difficulty: String(feedback.difficulty || 3),
+    }),
+
+  gradeExam: (examId: number, userAnswers: Record<string, string>) =>
+    formRequest<any>('/api/lesson/grade', {
+      exam_id: String(examId),
+      user_answers: JSON.stringify(userAnswers),
+    }),
+
+  generateConsolidation: (examId: number, roundNum: number = 1) =>
+    formRequest<any>('/api/lesson/consolidation', {
+      exam_id: String(examId),
+      round_num: String(roundNum),
+    }),
+
   chatAboutCourse: (lessonCourseId: number, question: string, userId: string) =>
-    formRequest<any>('/api/lesson/chat', { lesson_course_id: String(lessonCourseId), question, user_id: userId }),
+    formRequest<any>('/api/lesson/chat', {
+      lesson_course_id: String(lessonCourseId),
+      question,
+      user_id: userId,
+    }),
 
   chatAboutCourseStream: (lessonCourseId: number, question: string, userId: string, onChunk: (text: string) => void) =>
-    streamFormChat('/api/lesson/chat/stream', { lesson_course_id: String(lessonCourseId), question, user_id: userId }, onChunk),
+    streamFormChat('/api/lesson/chat/stream', {
+      lesson_course_id: String(lessonCourseId),
+      question,
+      user_id: userId,
+    }, onChunk),
+
+  getProfile: (userId: string) =>
+    request(`/api/lesson/profile/${userId}`),
+
+  updateProfile: (userId: string, profile: any) =>
+    request(`/api/lesson/profile/${userId}`, { method: 'PUT', body: JSON.stringify(profile) }),
 };

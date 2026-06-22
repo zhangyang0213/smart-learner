@@ -195,6 +195,7 @@ class LessonCourse(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     course_name = Column(String(200), comment="课程名称")
     outline = Column(JSON, comment="课程脉络")
+    materials_text = Column(Text, nullable=True, comment="解析后的课件原文")
     status = Column(String(20), default="draft", comment="draft/active/completed")
     created_at = Column(DateTime, default=datetime.utcnow)
 

@@ -86,29 +86,42 @@ async def generate_outline(req: OutlineRequest, db: AsyncSession = Depends(get_d
 
 
 @router.post("/generate")
-async def generate_lesson(req: LessonGenerateRequest, db: AsyncSession = Depends(get_db)):
-    """生成单课内容"""
-    # Find the lesson course
+async def generate_lesson(
+    lesson_course_id: int = Form(...),
+    unit_index: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """生成单课内容 - 使用存储的课件材料"""
+    # Get the lesson course with stored materials
     result = await db.execute(
-        select(LessonCourse).where(
-            LessonCourse.course_name == req.course_name,
-        ).order_by(LessonCourse.id.desc()).limit(1)
+        select(LessonCourse).where(LessonCourse.id == lesson_course_id)
     )
     lesson_course = result.scalar_one_or_none()
+    if not lesson_course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+
+    outline = lesson_course.outline or {}
+    units = outline.get("units", [])
+
+    if unit_index < 0 or unit_index >= len(units):
+        raise HTTPException(status_code=400, detail="单元索引超出范围")
+
+    unit = units[unit_index]
+    materials = lesson_course.materials_text or ""
 
     lesson_data = await lesson_service.generate_lesson(
-        course_name=req.course_name,
-        unit_name=req.unit_name,
-        unit_index=req.unit_index,
-        knowledge_points=req.knowledge_points,
-        materials=req.materials,
-        learner_background=req.learner_background,
+        course_name=lesson_course.course_name,
+        unit_name=unit.get("name", f"第{unit_index+1}单元"),
+        unit_index=unit_index,
+        knowledge_points=unit.get("knowledge_points", []),
+        materials=materials,
     )
 
+    # Save to database
     lesson_content = LessonContent(
-        lesson_course_id=lesson_course.id if lesson_course else 0,
-        unit_index=req.unit_index,
-        unit_name=req.unit_name,
+        lesson_course_id=lesson_course_id,
+        unit_index=unit_index,
+        unit_name=unit.get("name", ""),
         content=lesson_data,
         mastery_level="未接触",
     )
@@ -130,20 +143,53 @@ async def submit_feedback(req: FeedbackRequest, db: AsyncSession = Depends(get_d
 
 
 @router.post("/evaluate")
-async def evaluate_mastery(req: EvaluateRequest):
+async def evaluate_mastery(
+    lesson_course_id: int = Form(...),
+    unit_index: int = Form(...),
+    can_retell: str = Form(default=""),
+    stuck_at: str = Form(default=""),
+    difficulty: int = Form(default=3),
+    db: AsyncSession = Depends(get_db),
+):
     """评估掌握度"""
-    evaluation = await lesson_service.evaluate_mastery(
-        user_feedback=req.user_feedback,
-        lesson_content=req.lesson_content,
+    # Get the lesson content
+    result = await db.execute(
+        select(LessonContent).where(
+            LessonContent.lesson_course_id == lesson_course_id,
+            LessonContent.unit_index == unit_index,
+        ).order_by(LessonContent.id.desc()).limit(1)
     )
+    lesson = result.scalar_one_or_none()
+
+    lesson_content = lesson.content if lesson else {}
+    user_feedback = {
+        "can_retell": can_retell,
+        "stuck_at": stuck_at,
+        "difficulty": difficulty,
+    }
+
+    evaluation = await lesson_service.evaluate_mastery(
+        user_feedback=user_feedback,
+        lesson_content=lesson_content,
+    )
+
+    # Update mastery level
+    if lesson:
+        lesson.mastery_level = evaluation.get("mastery_level", "未接触")
+        await db.commit()
+
     return {"evaluation": evaluation}
 
 
 @router.post("/exam")
-async def generate_exam(req: ExamRequest, db: AsyncSession = Depends(get_db)):
+async def generate_exam(
+    lesson_course_id: int = Form(...),
+    exam_type: str = Form(default="final"),
+    db: AsyncSession = Depends(get_db),
+):
     """生成考试"""
     result = await db.execute(
-        select(LessonCourse).where(LessonCourse.id == req.course_id)
+        select(LessonCourse).where(LessonCourse.id == lesson_course_id)
     )
     lesson_course = result.scalar_one_or_none()
     if not lesson_course:
@@ -151,7 +197,7 @@ async def generate_exam(req: ExamRequest, db: AsyncSession = Depends(get_db)):
 
     # Get all lesson contents for this course
     result = await db.execute(
-        select(LessonContent).where(LessonContent.lesson_course_id == req.course_id)
+        select(LessonContent).where(LessonContent.lesson_course_id == lesson_course_id)
     )
     lessons = result.scalars().all()
 
@@ -160,15 +206,19 @@ async def generate_exam(req: ExamRequest, db: AsyncSession = Depends(get_db)):
         for l in lessons
     ]
 
+    # If no lesson contents yet, use the outline and materials
+    if not lessons_data:
+        lessons_data = [{"unit_name": "课程材料", "content": {"text": lesson_course.materials_text or ""}}]
+
     exam_data = await lesson_service.generate_exam(
         course_outline=lesson_course.outline or {},
         lessons=lessons_data,
-        exam_type=req.exam_type,
+        exam_type=exam_type,
     )
 
     exam_record = ExamRecord(
-        lesson_course_id=req.course_id,
-        exam_type=req.exam_type,
+        lesson_course_id=lesson_course_id,
+        exam_type=exam_type,
         questions=exam_data.get("questions", []),
         round_num=1,
     )
@@ -180,21 +230,31 @@ async def generate_exam(req: ExamRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/grade")
-async def grade_exam(req: GradeRequest, db: AsyncSession = Depends(get_db)):
+async def grade_exam(
+    exam_id: int = Form(...),
+    user_answers: str = Form(default="{}"),  # JSON string
+    db: AsyncSession = Depends(get_db),
+):
     """批改考试"""
+    import json as _json
     result = await db.execute(
-        select(ExamRecord).where(ExamRecord.id == req.exam_id)
+        select(ExamRecord).where(ExamRecord.id == exam_id)
     )
     exam_record = result.scalar_one_or_none()
     if not exam_record:
         raise HTTPException(status_code=404, detail="考试记录不存在")
 
+    try:
+        answers_dict = _json.loads(user_answers)
+    except:
+        answers_dict = {}
+
     grading = await lesson_service.grade_exam(
         exam={"title": "", "questions": exam_record.questions},
-        user_answers=req.user_answers,
+        user_answers=answers_dict,
     )
 
-    exam_record.user_answers = req.user_answers
+    exam_record.user_answers = answers_dict
     exam_record.score = grading.get("total_score", 0)
     exam_record.graded = grading
     await db.commit()
@@ -203,10 +263,14 @@ async def grade_exam(req: GradeRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/consolidation")
-async def generate_consolidation(req: ConsolidationRequest, db: AsyncSession = Depends(get_db)):
+async def generate_consolidation(
+    exam_id: int = Form(...),
+    round_num: int = Form(default=1),
+    db: AsyncSession = Depends(get_db),
+):
     """生成巩固卷"""
     result = await db.execute(
-        select(ExamRecord).where(ExamRecord.id == req.exam_id)
+        select(ExamRecord).where(ExamRecord.id == exam_id)
     )
     exam_record = result.scalar_one_or_none()
     if not exam_record:
@@ -216,14 +280,14 @@ async def generate_consolidation(req: ConsolidationRequest, db: AsyncSession = D
 
     consolidation = await lesson_service.generate_consolidation(
         weak_points=weak_points,
-        round_num=req.round_num,
+        round_num=round_num,
     )
 
     new_exam = ExamRecord(
         lesson_course_id=exam_record.lesson_course_id,
         exam_type="consolidation",
         questions=consolidation.get("questions", []),
-        round_num=req.round_num,
+        round_num=round_num,
     )
     db.add(new_exam)
     await db.commit()
@@ -359,6 +423,7 @@ async def upload_and_learn(
         user_id=user_id,
         course_name=course_name,
         outline=outline,
+        materials_text=combined_text,
         status="active",
     )
     db.add(lesson_course)
