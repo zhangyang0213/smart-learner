@@ -133,14 +133,17 @@ export default function Dashboard() {
           dashboard.getOverview(userId),
           dashboard.getRecentActivities(userId, 5),
         ]);
-        if (overviewRes.success) setOverview(overviewRes.data);
-        if (activitiesRes.success) setActivities(activitiesRes.data);
+        const od = (overviewRes as any);
+        setOverview(od?.data || od?.overview || od || mockOverview);
+        const ad = (activitiesRes as any);
+        setActivities(ad?.data || ad?.activities || ad || mockActivities);
       } catch {
         // Use mock data on error
       }
       try {
         const statsRes = await study.getStats(userId, 7);
-        if (statsRes.success) setStats(statsRes.data);
+        const sd = (statsRes as any);
+        setStats(sd?.data || sd?.stats || sd || mockStats);
       } catch {
         // Use mock data on error
       }
