@@ -404,8 +404,8 @@ export default function Lesson() {
     // Mock fallback - generate from current unit's knowledge points
     const unit = outline?.units[currentUnitIndex];
     if (unit) {
-      const mockQs = unit.knowledge_points.map((kp, i) => ({
-        type: 'single_choice',
+      const mockQs: ExamQuestion[] = unit.knowledge_points.map((kp) => ({
+        type: 'single_choice' as const,
         knowledge_point: kp,
         question: `关于${kp}，以下哪个说法是正确的？`,
         options: [`${kp}是核心概念`, `${kp}不重要`, `${kp}已被淘汰`, `${kp}仅适用于理论`],

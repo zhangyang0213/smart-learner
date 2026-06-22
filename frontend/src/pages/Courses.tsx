@@ -62,7 +62,24 @@ export default function Courses() {
     async function fetchCourses() {
       try {
         const res = await course.listCourses(userId);
-        if (res.success) setCourses(res.data);
+        // Backend returns {courses: [...]}, not {success, data}
+        const data = (res as any)?.courses || (res as any)?.data || res;
+        const coursesList = Array.isArray(data) ? data : (data?.courses && Array.isArray(data.courses) ? data.courses : null);
+        if (coursesList) {
+          setCourses(
+            coursesList.map((c: any) => ({
+              id: String(c.id ?? ''),
+              name: c.name ?? '',
+              code: c.code ?? '',
+              teacher: c.teacher ?? '',
+              semester: c.semester ?? '',
+              description: c.description ?? c.schedule ?? '',
+              documents: c.documents ?? [],
+              created_at: c.created_at ?? new Date().toISOString(),
+              updated_at: c.updated_at ?? new Date().toISOString(),
+            }))
+          );
+        }
       } catch {
         // Use mock data
       }
@@ -86,8 +103,22 @@ export default function Courses() {
     setSubmitting(true);
     try {
       const res = await course.addCourse({ ...form, user_id: userId });
-      if (res.success) {
-        setCourses((prev) => [...prev, res.data]);
+      // Backend returns {message, course_id}, not {success, data}
+      const r = res as any;
+      const courseId = r?.course_id ?? r?.data?.course_id ?? r?.id;
+      if (courseId !== undefined || r?.message) {
+        const newCourse: Course = {
+          id: String(courseId ?? `server-${Date.now()}`),
+          name: form.name,
+          code: form.code,
+          teacher: form.teacher,
+          semester: form.semester,
+          description: form.description,
+          documents: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setCourses((prev) => [...prev, newCourse]);
         setShowModal(false);
         setForm({ name: '', code: '', teacher: '', semester: '2025-2026-2', description: '' });
       }

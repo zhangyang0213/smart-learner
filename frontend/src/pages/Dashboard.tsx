@@ -61,7 +61,7 @@ const mockActivities: ActivityType[] = [
   { id: '5', type: 'study_record', title: '学习记录', description: '学习了 2.5 小时「高等数学」', timestamp: '2026-06-15T20:00:00Z' },
 ];
 
-const efficiencyScore = 82;
+const efficiencyScoreDefault = 82;
 
 function CircularProgress({ value, size = 80, strokeWidth = 6 }: { value: number; size?: number; strokeWidth?: number }) {
   const radius = (size - strokeWidth) / 2;
@@ -123,6 +123,7 @@ export default function Dashboard() {
   const [overview, setOverview] = useState<DashboardOverview>(mockOverview);
   const [stats, setStats] = useState<StudyStats>(mockStats);
   const [activities, setActivities] = useState<ActivityType[]>(mockActivities);
+  const [efficiencyScore, setEfficiencyScore] = useState(efficiencyScoreDefault);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -133,17 +134,56 @@ export default function Dashboard() {
           dashboard.getOverview(userId),
           dashboard.getRecentActivities(userId, 5),
         ]);
-        const od = (overviewRes as any);
-        setOverview(od?.data || od?.overview || od || mockOverview);
-        const ad = (activitiesRes as any);
-        setActivities(ad?.data || ad?.activities || ad || mockActivities);
+        // Backend returns data directly, not wrapped in {success, data}
+        const od = overviewRes as any;
+        if (od && (od.course_count !== undefined || od.overview !== undefined)) {
+          const data = od.overview || od;
+          setOverview({
+            total_courses: data.course_count ?? data.total_courses ?? 0,
+            total_documents: data.document_count ?? data.total_documents ?? 0,
+            total_knowledge_items: data.knowledge_count ?? data.total_knowledge_items ?? 0,
+            active_plans: data.active_plans ?? 0,
+            study_hours_today: (data.today_study_minutes ?? 0) / 60,
+            study_hours_week: data.weekly_stats?.total_hours ?? data.study_hours_week ?? 0,
+            upcoming_deadlines: data.upcoming_deadlines ?? [],
+          });
+          if (data.efficiency_score !== undefined) {
+            setEfficiencyScore(Number(data.efficiency_score) || 0);
+          }
+        }
+        const ad = activitiesRes as any;
+        const activitiesData = ad?.activities || ad?.data || (Array.isArray(ad) ? ad : null);
+        if (Array.isArray(activitiesData)) {
+          setActivities(
+            activitiesData.map((a: any, idx: number) => ({
+              id: String(a.id ?? idx),
+              type: a.type || 'study_record',
+              title: a.title || a.subject || '',
+              description: a.description || (a.subject ? `学习了 ${a.duration} 分钟「${a.subject}」` : a.title || ''),
+              timestamp: a.time || a.timestamp || new Date().toISOString(),
+            }))
+          );
+        }
       } catch {
         // Use mock data on error
       }
       try {
         const statsRes = await study.getStats(userId, 7);
-        const sd = (statsRes as any);
-        setStats(sd?.data || sd?.stats || sd || mockStats);
+        const sd = statsRes as any;
+        if (sd && (sd.stats !== undefined || sd.efficiency_score !== undefined)) {
+          const statsData = sd.stats || sd;
+          setStats({
+            total_hours: statsData.total_hours ?? 0,
+            daily_average: statsData.daily_average ?? 0,
+            streak_days: statsData.streak_days ?? 0,
+            subject_distribution: statsData.subject_distribution ?? [],
+            weekly_data: statsData.weekly_data ?? [],
+            monthly_data: statsData.monthly_data ?? [],
+          });
+          if (sd.efficiency_score !== undefined) {
+            setEfficiencyScore(Number(sd.efficiency_score) || 0);
+          }
+        }
       } catch {
         // Use mock data on error
       }

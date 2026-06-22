@@ -70,7 +70,9 @@ export default function Knowledge() {
     async function fetchCategories() {
       try {
         const res = await knowledge.listCategories(userId);
-        if (res.success && res.data.length > 0) setCategories(res.data);
+        // Backend returns {categories: [...]}, not {success, data}
+        const data = (res as any)?.categories || (res as any)?.data;
+        if (Array.isArray(data) && data.length > 0) setCategories(data);
       } catch {
         // Use mock data
       }
@@ -84,9 +86,34 @@ export default function Knowledge() {
     setHasSearched(true);
     try {
       const res = await knowledge.searchKnowledge(searchQuery, userId, selectedCategory || undefined);
-      if (res.success) setSearchResults(res.data);
+      // Backend returns {results, query}, not {success, data}
+      const data = (res as any)?.results || (res as any)?.data;
+      if (Array.isArray(data)) {
+        setSearchResults(
+          data.map((item: any, idx: number) => ({
+            id: String(item.id ?? idx),
+            title: item.title ?? '',
+            content: item.content ?? '',
+            category: item.category ?? '未分类',
+            tags: Array.isArray(item.tags) ? item.tags : [],
+            source: item.source,
+            is_archived: false,
+            created_at: item.created_at ?? new Date().toISOString(),
+            updated_at: item.created_at ?? new Date().toISOString(),
+          }))
+        );
+      } else {
+        // Filter mock data as last resort
+        const filtered = mockItems.filter(
+          (item) =>
+            item.title.includes(searchQuery) ||
+            item.content.includes(searchQuery) ||
+            item.tags.some((t) => t.includes(searchQuery))
+        );
+        setSearchResults(filtered);
+      }
     } catch {
-      // Filter mock data
+      // Filter mock data as last resort
       const filtered = mockItems.filter(
         (item) =>
           item.title.includes(searchQuery) ||
@@ -118,8 +145,21 @@ export default function Knowledge() {
         tags: tags.length > 0 ? tags.join(',') : undefined,
         user_id: userId,
       });
-      if (res.success) {
-        setSearchResults((prev) => [res.data, ...prev]);
+      // Backend returns {message, id}, not {success, data}
+      const r = res as any;
+      if (r?.id !== undefined || r?.message) {
+        const newItem: KnowledgeItem = {
+          id: String(r?.id ?? `server-${Date.now()}`),
+          title: addForm.title,
+          content: addForm.content,
+          category: addForm.category,
+          tags,
+          source: addForm.source || undefined,
+          is_archived: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setSearchResults((prev) => [newItem, ...prev]);
         setShowAddModal(false);
         setAddForm({ title: '', content: '', category: '', source: '', tags: '' });
       }
@@ -154,8 +194,28 @@ export default function Knowledge() {
     setQaLoading(true);
     try {
       const res = await knowledge.askKnowledge(question, userId);
-      if (res.success) {
-        setQaMessages((prev) => [...prev, res.data]);
+      // Backend returns {answer, sources, question}, not {success, data}
+      const r = res as any;
+      const answer = r?.answer || r?.data?.answer || r?.content || (typeof r === 'string' ? r : '');
+      if (answer) {
+        const assistantMsg: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          session_id: 'knowledge-qa',
+          role: 'assistant',
+          content: answer,
+          timestamp: new Date().toISOString(),
+          metadata: r?.sources ? { sources: r.sources } : undefined,
+        };
+        setQaMessages((prev) => [...prev, assistantMsg]);
+      } else {
+        const assistantMsg: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          session_id: 'knowledge-qa',
+          role: 'assistant',
+          content: 'AI暂时无法回答，请稍后再试。',
+          timestamp: new Date().toISOString(),
+        };
+        setQaMessages((prev) => [...prev, assistantMsg]);
       }
     } catch {
       const assistantMsg: ChatMessage = {

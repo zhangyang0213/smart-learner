@@ -99,7 +99,35 @@ export default function Teams() {
     async function fetchTeams() {
       try {
         const res = await team.listTeams(userId);
-        if (res.success) setTeams(res.data);
+        // Backend returns {teams: [...]}, not {success, data}
+        const data = (res as any)?.teams || (res as any)?.data;
+        if (Array.isArray(data)) {
+          setTeams(
+            data.map((t: any) => ({
+              id: String(t.id ?? ''),
+              name: t.name ?? '',
+              description: t.description ?? '',
+              creator_id: '',
+              members: [],
+              announcements: (t.announcements || []).map((a: any, idx: number) => ({
+                id: String(a.id ?? idx),
+                title: a.title || a.content?.slice(0, 20) || '',
+                content: a.content ?? '',
+                author: a.author ?? '',
+                created_at: a.created_at ?? new Date().toISOString(),
+              })),
+              todos: (t.shared_todos || t.todos || []).map((todo: any, idx: number) => ({
+                id: String(todo.id ?? idx),
+                title: todo.title ?? '',
+                completed: todo.completed ?? false,
+                assignee: todo.assignee || (todo.assignee_id ? String(todo.assignee_id) : undefined),
+                due_date: todo.due_date || todo.deadline,
+                created_at: todo.created_at ?? new Date().toISOString(),
+              })),
+              created_at: t.created_at ?? new Date().toISOString(),
+            }))
+          );
+        }
       } catch {
         // Use mock data
       }
@@ -113,8 +141,20 @@ export default function Teams() {
     setCreating(true);
     try {
       const res = await team.createTeam({ ...createForm, user_id: userId });
-      if (res.success) {
-        setTeams((prev) => [...prev, res.data]);
+      // Backend returns {message, team_id}, not {success, data}
+      const r = res as any;
+      if (r?.team_id !== undefined || r?.message) {
+        const newTeam: Team = {
+          id: String(r?.team_id ?? `server-${Date.now()}`),
+          name: createForm.name,
+          description: createForm.description,
+          creator_id: 'current-user',
+          members: [{ id: 'current-user', name: '我', role: 'owner', joined_at: new Date().toISOString() }],
+          announcements: [],
+          todos: [],
+          created_at: new Date().toISOString(),
+        };
+        setTeams((prev) => [...prev, newTeam]);
         setShowCreateModal(false);
         setCreateForm({ name: '', description: '' });
       }
@@ -141,8 +181,39 @@ export default function Teams() {
     setJoining(true);
     try {
       const res = await team.joinTeam(joinCode.trim(), userId);
-      if (res.success) {
-        setTeams((prev) => [...prev, res.data]);
+      // Backend returns {message}, not {success, data}
+      const r = res as any;
+      if (r?.message) {
+        // Refresh team list to show the joined team
+        const listRes = await team.listTeams(userId);
+        const data = (listRes as any)?.teams || (listRes as any)?.data;
+        if (Array.isArray(data)) {
+          setTeams(
+            data.map((t: any) => ({
+              id: String(t.id ?? ''),
+              name: t.name ?? '',
+              description: t.description ?? '',
+              creator_id: '',
+              members: [],
+              announcements: (t.announcements || []).map((a: any, idx: number) => ({
+                id: String(a.id ?? idx),
+                title: a.title || a.content?.slice(0, 20) || '',
+                content: a.content ?? '',
+                author: a.author ?? '',
+                created_at: a.created_at ?? new Date().toISOString(),
+              })),
+              todos: (t.shared_todos || t.todos || []).map((todo: any, idx: number) => ({
+                id: String(todo.id ?? idx),
+                title: todo.title ?? '',
+                completed: todo.completed ?? false,
+                assignee: todo.assignee || (todo.assignee_id ? String(todo.assignee_id) : undefined),
+                due_date: todo.due_date || todo.deadline,
+                created_at: todo.created_at ?? new Date().toISOString(),
+              })),
+              created_at: t.created_at ?? new Date().toISOString(),
+            }))
+          );
+        }
         setShowJoinModal(false);
         setJoinCode('');
       }
@@ -157,9 +228,22 @@ export default function Teams() {
     setPostingAnnouncement(true);
     try {
       const res = await team.addAnnouncement(selectedTeam.id, { ...announcementForm, user_id: userId });
-      if (res.success) {
-        setSelectedTeam(res.data);
-        setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? res.data : t)));
+      // Backend returns {message}, not {success, data}
+      const r = res as any;
+      if (r?.message) {
+        const newAnnouncement = {
+          id: `server-${Date.now()}`,
+          title: announcementForm.title,
+          content: announcementForm.content,
+          author: '我',
+          created_at: new Date().toISOString(),
+        };
+        const updatedTeam = {
+          ...selectedTeam,
+          announcements: [newAnnouncement, ...selectedTeam.announcements],
+        };
+        setSelectedTeam(updatedTeam);
+        setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? updatedTeam : t)));
         setAnnouncementForm({ title: '', content: '' });
       }
     } catch {
@@ -191,9 +275,23 @@ export default function Teams() {
         due_date: todoForm.due_date || undefined,
         user_id: userId,
       });
-      if (res.success) {
-        setSelectedTeam(res.data);
-        setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? res.data : t)));
+      // Backend returns {message}, not {success, data}
+      const r = res as any;
+      if (r?.message) {
+        const newTodo = {
+          id: `server-${Date.now()}`,
+          title: todoForm.title,
+          completed: false,
+          assignee: todoForm.assignee || undefined,
+          due_date: todoForm.due_date || undefined,
+          created_at: new Date().toISOString(),
+        };
+        const updatedTeam = {
+          ...selectedTeam,
+          todos: [...selectedTeam.todos, newTodo],
+        };
+        setSelectedTeam(updatedTeam);
+        setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? updatedTeam : t)));
         setTodoForm({ title: '', assignee: '', due_date: '' });
       }
     } catch {
@@ -220,9 +318,16 @@ export default function Teams() {
     if (!selectedTeam) return;
     try {
       const res = await team.toggleTodo(selectedTeam.id, todoIndex);
-      if (res.success) {
-        setSelectedTeam(res.data);
-        setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? res.data : t)));
+      // Backend returns {message}, not {success, data}
+      const r = res as any;
+      if (r?.message) {
+        // Toggle locally since backend doesn't return the updated team
+        const updatedTodos = selectedTeam.todos.map((t, i) =>
+          i === todoIndex ? { ...t, completed: !t.completed } : t
+        );
+        const updatedTeam = { ...selectedTeam, todos: updatedTodos };
+        setSelectedTeam(updatedTeam);
+        setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? updatedTeam : t)));
       }
     } catch {
       const updatedTodos = selectedTeam.todos.map((t, i) =>

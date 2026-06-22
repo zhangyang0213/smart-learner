@@ -170,8 +170,42 @@ export default function Papers() {
     setRelatedLoading(true);
     try {
       const res = await paper.suggestRelated(analysis.id || '1', userId);
-      const data = (res as any)?.related_topics ? res : (res as any)?.data || [];
-      setRelatedPapers(Array.isArray(data) ? data : [data]);
+      // Backend returns {related_topics, search_keywords, suggested_directions} or {raw_suggestion}
+      const r = res as any;
+      const directions = r?.suggested_directions || r?.data?.suggested_directions;
+      if (Array.isArray(directions) && directions.length > 0) {
+        setRelatedPapers(
+          directions.map((dir: string, idx: number) => ({
+            id: `dir-${idx}`,
+            title: dir,
+            authors: [],
+            abstract: '',
+            key_findings: [],
+            methodology: '',
+            contributions: [],
+            limitations: [],
+            related_topics: [],
+            created_at: new Date().toISOString(),
+          }))
+        );
+      } else if (r?.raw_suggestion) {
+        setRelatedPapers([
+          {
+            id: 'raw',
+            title: 'AI 推荐研究方向',
+            authors: [],
+            abstract: r.raw_suggestion,
+            key_findings: [],
+            methodology: '',
+            contributions: [],
+            limitations: [],
+            related_topics: [],
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } else {
+        setRelatedPapers([]);
+      }
     } catch {
       setRelatedPapers([]);
     }

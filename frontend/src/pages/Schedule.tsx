@@ -74,8 +74,16 @@ export default function Schedule() {
     async function fetchSchedule() {
       try {
         const res = await auth.getSchedule(userId, currentWeek);
-        if (res.success && res.data) {
-          setSchedule(res.data);
+        // Backend returns {schedule, current_week, ...}, not {success, data}
+        const r = res as any;
+        const scheduleData = r?.schedule || r?.data?.schedule;
+        if (Array.isArray(scheduleData)) {
+          setSchedule(scheduleData);
+          if (r?.target_week) {
+            setCurrentWeek(r.target_week);
+          } else if (r?.current_week) {
+            setCurrentWeek(r.current_week);
+          }
           setLoading(false);
           return;
         }

@@ -117,29 +117,30 @@ function QATab({ courseId }: { courseId: string }) {
       // If streaming fails, fall back to non-streaming API
       try {
         const res = await courseApi.askQuestion(courseId, question, userId);
-        if (res.success) {
+        // Backend returns {answer, sources, question}, not {success, data}
+        const r = res as any;
+        const answer = r?.answer || r?.data?.answer || r?.content || (typeof r === 'string' ? r : '');
+        const sources = r?.sources || r?.data?.sources;
+        if (answer) {
+          const finalMsg: ChatMessage = {
+            ...assistantMsg,
+            content: answer,
+            metadata: sources ? { sources } : undefined,
+          };
           setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantId ? res.data : msg
-            )
+            prev.map((msg) => (msg.id === assistantId ? finalMsg : msg))
           );
-          addMessage(courseId, res.data);
+          addMessage(courseId, finalMsg);
           setStreaming(false);
           return;
         }
       } catch {
-        // Use mock response
+        // Show error message instead of fake response
       }
-      // Mock response on error
-      const mockContent = `关于"${question}"，这是一个很好的问题。根据课程内容，这个概念涉及到数据结构中的核心知识点。建议结合课件中的示例进行深入理解。`;
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
-            ? {
-                ...msg,
-                content: mockContent,
-                metadata: { sources: ['第2章-线性表.pdf', '第4章-树与二叉树.pdf'] },
-              }
+            ? { ...msg, content: 'AI暂时无法回答，请稍后再试。' }
             : msg
         )
       );
@@ -259,8 +260,20 @@ function DocsTab({ courseId }: { courseId: string }) {
     try {
       for (let i = 0; i < files.length; i++) {
         const res = await courseApi.uploadDocument(courseId, files[i], userId);
-        if (res.success) {
-          setDocuments((prev) => [...prev, res.data]);
+        // Backend returns {message, document_id, status, chunk_count}, not {success, data}
+        const r = res as any;
+        if (r?.document_id !== undefined || r?.message) {
+          const file = files[i];
+          const newDoc: Document = {
+            id: String(r?.document_id ?? `doc-${Date.now()}`),
+            course_id: courseId,
+            name: file.name,
+            file_type: file.name.split('.').pop() || 'pdf',
+            file_size: file.size,
+            file_url: '#',
+            uploaded_at: new Date().toISOString(),
+          };
+          setDocuments((prev) => [...prev, newDoc]);
         }
       }
     } catch {
@@ -356,7 +369,30 @@ function QuizTab({ courseId }: { courseId: string }) {
     setExpandedExplanations(new Set());
     try {
       const res = await courseApi.generateQuiz(courseId, userId, undefined, 5);
-      if (res.success) setQuestions(res.data);
+      // Backend returns {quiz, document_title}, not {success, data}
+      const r = res as any;
+      const quizData = r?.quiz || r?.data?.quiz || r?.data;
+      const questions = Array.isArray(quizData) ? quizData : (quizData?.questions || []);
+      if (questions.length > 0) {
+        setQuestions(
+          questions.map((q: any, idx: number) => ({
+            id: String(q.id ?? idx),
+            question: q.question ?? '',
+            options: q.options ?? [],
+            correct_answer: typeof q.correct_answer === 'number'
+              ? q.correct_answer
+              : q.correct_answer !== undefined
+                ? Number(q.correct_answer)
+                : (typeof q.answer === 'string' && q.options
+                    ? q.options.findIndex((_: string, i: number) => String.fromCharCode(65 + i) === q.answer)
+                    : 0),
+            explanation: q.explanation ?? '',
+            difficulty: q.difficulty ?? 'medium',
+          }))
+        );
+        setLoading(false);
+        return;
+      }
     } catch {
       setQuestions(mockQuizQuestions);
     }

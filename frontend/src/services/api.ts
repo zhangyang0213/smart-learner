@@ -234,10 +234,9 @@ export const course = {
 
   generateQuiz: (courseId: string, userId: string, documentId?: string, count: number = 5) =>
     formRequest<ApiResponse<QuizQuestion[]>>('/api/course/quiz/generate', {
-      course_id: courseId,
-      user_id: userId,
       document_id: documentId,
-      count,
+      num_questions: count,
+      difficulty: 'medium',
     }),
 };
 
@@ -307,13 +306,28 @@ export const paper = {
 // ============ Study ============
 export const study = {
   createPlan: (data: { title: string; goal: string; subject: string; start_date: string; end_date: string; user_id: string }) =>
-    formRequest<ApiResponse<StudyPlan>>('/api/study/plan/create', data),
+    formRequest<ApiResponse<StudyPlan>>('/api/study/plan/create', {
+      title: data.title,
+      goal: data.goal,
+      plan_type: '考试',
+      start_date: data.start_date,
+      end_date: data.end_date,
+      subjects: data.subject,
+      user_id: data.user_id,
+    }),
 
   listPlans: (userId: string) =>
     queryRequest<ApiResponse<StudyPlan[]>>('/api/study/plan/list', { user_id: userId }),
 
-  addRecord: (data: { plan_id: string; date: string; duration: number; content: string; notes?: string; mood?: string; user_id: string }) =>
-    formRequest<ApiResponse<StudyRecord>>('/api/study/record', data),
+  addRecord: (data: { plan_id?: string; date: string; duration: number; content: string; activity_type?: string; notes?: string; mood?: string; user_id: string }) =>
+    formRequest<ApiResponse<StudyRecord>>('/api/study/record', {
+      user_id: data.user_id,
+      subject: data.content,
+      duration: data.duration,
+      activity_type: data.activity_type || '学习',
+      date: data.date,
+      summary: data.notes || data.content,
+    }),
 
   getStats: (userId: string, days?: number) =>
     queryRequest<ApiResponse<StudyStats>>('/api/study/stats', { user_id: userId, days }),
@@ -332,7 +346,7 @@ export const team = {
 
   joinTeam: (inviteCode: string, userId: string) =>
     formRequest<ApiResponse<Team>>('/api/team/join', {
-      invite_code: inviteCode,
+      team_id: inviteCode,
       user_id: userId,
     }),
 
@@ -342,13 +356,15 @@ export const team = {
   addAnnouncement: (teamId: string, data: { title: string; content: string; user_id: string }) =>
     formRequest<ApiResponse<Team>>('/api/team/announcement', {
       team_id: teamId,
-      ...data,
+      content: data.content,
     }),
 
   addTodo: (teamId: string, data: { title: string; assignee?: string; due_date?: string; user_id: string }) =>
     formRequest<ApiResponse<Team>>('/api/team/todo', {
       team_id: teamId,
-      ...data,
+      title: data.title,
+      assignee_id: data.assignee,
+      deadline: data.due_date,
     }),
 
   toggleTodo: (teamId: string, todoIndex: number) =>

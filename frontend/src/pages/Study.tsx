@@ -85,8 +85,38 @@ export default function Study() {
           study.listPlans(userId),
           study.getStats(userId, 7),
         ]);
-        if (plansRes.success) setPlans(plansRes.data);
-        if (statsRes.success) setStats(statsRes.data);
+        // Backend returns {plans: [...]}, not {success, data}
+        const plansData = (plansRes as any)?.plans || (plansRes as any)?.data;
+        if (Array.isArray(plansData)) {
+          setPlans(
+            plansData.map((p: any) => ({
+              id: String(p.id ?? ''),
+              title: p.title ?? '',
+              goal: p.goal ?? '',
+              subject: p.plan_type ?? p.subject ?? '',
+              start_date: p.start_date ?? '',
+              end_date: p.end_date ?? '',
+              phases: p.milestones || p.phases || [],
+              status: p.status ?? 'active',
+              progress: p.progress ?? 0,
+              created_at: p.created_at ?? new Date().toISOString(),
+              updated_at: p.created_at ?? new Date().toISOString(),
+            }))
+          );
+        }
+        // Backend returns {stats, efficiency_score}, not {success, data}
+        const sd = statsRes as any;
+        if (sd && (sd.stats !== undefined || sd.efficiency_score !== undefined)) {
+          const statsData = sd.stats || sd;
+          setStats({
+            total_hours: statsData.total_hours ?? 0,
+            daily_average: statsData.daily_average ?? 0,
+            streak_days: statsData.streak_days ?? 0,
+            subject_distribution: statsData.subject_distribution ?? [],
+            weekly_data: statsData.weekly_data ?? [],
+            monthly_data: statsData.monthly_data ?? [],
+          });
+        }
       } catch {
         // Use mock data
       }
@@ -100,27 +130,52 @@ export default function Study() {
       setReportLoading(true);
       try {
         const res = await study.getDailyReport(userId);
-        if (res.success) setDailyReport(res.data);
+        // Backend returns {report, date}, not {success, data}
+        const r = res as any;
+        const report = r?.report || r?.data?.report;
+        if (report) {
+          setDailyReport({
+            date: r?.date || new Date().toISOString().slice(0, 10),
+            total_hours: r?.total_hours ?? 0,
+            records: r?.records ?? [],
+            summary: typeof report === 'string' ? report : (report.summary || ''),
+          });
+        }
       } catch {
         setDailyReport({
           date: new Date().toISOString().slice(0, 10),
-          total_hours: 3.5,
+          total_hours: 0,
           records: [],
-          summary: '今日学习状态良好，完成了数据结构二叉树相关题目的练习，英语阅读理解正确率有所提升。建议明天增加操作系统复习时间，保持各科目均衡发展。',
+          summary: '今日暂无学习记录，开始记录你的学习活动吧！',
         });
       }
       setReportLoading(false);
     }
     fetchReport();
-  }, []);
+  }, [userId]);
 
   const handleCreatePlan = async () => {
     if (!planForm.title || !planForm.goal || !planForm.subject || !planForm.start_date || !planForm.end_date) return;
     setCreating(true);
     try {
       const res = await study.createPlan({ ...planForm, user_id: userId });
-      if (res.success) {
-        setPlans((prev) => [...prev, res.data]);
+      // Backend returns {plan_id, ai_plan, message}, not {success, data}
+      const r = res as any;
+      if (r?.plan_id !== undefined || r?.message) {
+        const newPlan: StudyPlan = {
+          id: String(r?.plan_id ?? `server-${Date.now()}`),
+          title: planForm.title,
+          goal: planForm.goal,
+          subject: planForm.subject,
+          start_date: planForm.start_date,
+          end_date: planForm.end_date,
+          phases: r?.ai_plan?.phases || [],
+          status: 'active',
+          progress: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setPlans((prev) => [...prev, newPlan]);
         setShowCreateForm(false);
         setPlanForm({ title: '', goal: '', subject: '', start_date: '', end_date: '' });
       }
@@ -154,6 +209,7 @@ export default function Study() {
         duration: Number(recordForm.duration),
         user_id: userId,
       });
+      // Backend returns {message, record_id} - success if no exception
     } catch {
       // Silently fail
     }
