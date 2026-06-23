@@ -3,6 +3,22 @@ from collections import defaultdict
 from app.services.llm_service import llm_service
 
 
+def _parse_date(date_str: str):
+    """Parse date string in various formats, return date object"""
+    if not date_str:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    # Fallback: try isoformat parse
+    try:
+        return datetime.fromisoformat(date_str).date()
+    except Exception:
+        return None
+
+
 class StudyAnalyzer:
     """学习数据分析服务"""
 
@@ -40,7 +56,7 @@ class StudyAnalyzer:
             date = today - timedelta(days=i)
             day_duration = sum(
                 r.get("duration", 0) for r in records
-                if r.get("date") and datetime.strptime(r["date"], "%Y-%m-%d").date() == date
+                if r.get("date") and _parse_date(r["date"]) == date
             )
             daily_trend.append({
                 "date": date.isoformat(),
@@ -53,7 +69,7 @@ class StudyAnalyzer:
         while True:
             day_records = [
                 r for r in records
-                if r.get("date") and datetime.strptime(r["date"], "%Y-%m-%d").date() == check_date
+                if r.get("date") and _parse_date(r["date"]) == check_date
             ]
             if day_records:
                 streak += 1

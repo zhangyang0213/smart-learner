@@ -102,6 +102,18 @@ async def upload_schedule(
     }
 
 
+@router.get("/schedule/")
+async def get_schedule_no_user(
+    week: Optional[int] = Query(default=None),
+):
+    """获取课表（未指定用户ID时返回空课表）"""
+    return {
+        "schedule": [],
+        "current_week": schedule_parser.get_current_week(),
+        "message": "请先登录后再查看课表",
+    }
+
+
 @router.get("/schedule/{user_id}")
 async def get_schedule(
     user_id: int,
@@ -112,7 +124,11 @@ async def get_schedule(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
+        return {
+            "schedule": [],
+            "current_week": schedule_parser.get_current_week(),
+            "message": "用户不存在，请先登录",
+        }
 
     if not user.cas_token:
         return {

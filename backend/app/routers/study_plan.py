@@ -63,7 +63,7 @@ async def list_study_plans(
     if status:
         stmt = stmt.where(StudyPlan.status == status)
     result = await db.execute(stmt)
-    plans = result.all()
+    plans = result.scalars().all()
 
     return {
         "plans": [
@@ -124,7 +124,7 @@ async def get_study_stats(
         StudyRecord.date >= since,
     )
     result = await db.execute(stmt)
-    records = result.all()
+    records = result.scalars().all()
 
     records_data = [
         {
@@ -160,7 +160,7 @@ async def get_daily_report(
         StudyRecord.date <= end,
     )
     result = await db.execute(stmt)
-    records = result.all()
+    records = result.scalars().all()
 
     records_data = [
         {
@@ -170,6 +170,9 @@ async def get_daily_report(
         }
         for r in records
     ]
+
+    if not records_data:
+        return {"report": "今日暂无学习记录，开始学习吧！", "date": target_date.isoformat()}
 
     report = await study_analyzer.generate_ai_report(records_data)
     return {"report": report, "date": target_date.isoformat()}

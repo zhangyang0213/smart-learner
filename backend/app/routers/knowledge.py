@@ -69,10 +69,10 @@ async def search_knowledge(
         stmt = select(KnowledgeItem).where(
             KnowledgeItem.user_id == user_id,
             KnowledgeItem.category == category,
-            KnowledgeItem.is_archived == False,
+            KnowledgeItem.is_archived.is_(False),
         )
         db_result = await db.execute(stmt)
-        db_items = db_result.all()
+        db_items = db_result.scalars().all()
         # 合并结果
         for item in db_items:
             results.append({
@@ -124,7 +124,7 @@ async def list_categories(user_id: int = Query(...), db: AsyncSession = Depends(
     """获取知识分类列表"""
     stmt = select(KnowledgeItem.category).where(
         KnowledgeItem.user_id == user_id,
-        KnowledgeItem.is_archived == False,
+        KnowledgeItem.is_archived.is_(False),
     ).distinct()
     result = await db.execute(stmt)
     categories = [row[0] for row in result.all()]
@@ -142,14 +142,14 @@ async def list_knowledge_items(
     """获取知识条目列表"""
     stmt = select(KnowledgeItem).where(
         KnowledgeItem.user_id == user_id,
-        KnowledgeItem.is_archived == False,
+        KnowledgeItem.is_archived.is_(False),
     )
     if category:
         stmt = stmt.where(KnowledgeItem.category == category)
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
 
     result = await db.execute(stmt)
-    items = result.all()
+    items = result.scalars().all()
 
     return {
         "items": [

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from app.database.connection import get_db
-from app.models.models import User, Course, Document, KnowledgeItem, StudyRecord, StudyPlan
+from app.models.models import User, Course, UserCourse, Document, KnowledgeItem, StudyRecord, StudyPlan
 from app.services.study_analyzer import study_analyzer
 
 router = APIRouter(prefix="/api/dashboard", tags=["仪表盘"])
@@ -17,14 +17,9 @@ async def get_overview(
     db: AsyncSession = Depends(get_db),
 ):
     """获取仪表盘概览数据"""
-    # 课程数
+    # 课程数（通过UserCourse关联查询）
     course_count = await db.execute(
-        select(func.count()).select_from(
-            Course.__table__.join(
-                "user_courses",
-                Course.id == __import__("sqlalchemy").column("user_courses", "course_id")
-            )
-        )
+        select(func.count(UserCourse.id)).where(UserCourse.user_id == user_id)
     )
 
     # 简化查询
@@ -32,7 +27,7 @@ async def get_overview(
     knowledge_count = await db.execute(
         select(func.count(KnowledgeItem.id)).where(
             KnowledgeItem.user_id == user_id,
-            KnowledgeItem.is_archived == False,
+            KnowledgeItem.is_archived.is_(False),
         )
     )
 
@@ -66,7 +61,7 @@ async def get_overview(
             StudyRecord.date >= week_ago,
         )
     )
-    records = week_records.all()
+    records = week_records.scalars().all()
     records_data = [
         {
             "subject": r.subject,
@@ -106,7 +101,7 @@ async def get_recent_activities(
         .order_by(StudyRecord.created_at.desc())
         .limit(limit)
     )
-    records = recent_records.all()
+    records = recent_records.scalars().all()
 
     # 最近知识条目
     recent_knowledge = await db.execute(
@@ -115,7 +110,7 @@ async def get_recent_activities(
         .order_by(KnowledgeItem.created_at.desc())
         .limit(limit)
     )
-    knowledge_items = recent_knowledge.all()
+    knowledge_items = recent_knowledge.scalars().all()
 
     activities = []
 

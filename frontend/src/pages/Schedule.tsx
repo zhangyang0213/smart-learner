@@ -65,7 +65,7 @@ function getCourseColor(courseName: string): string {
 export default function Schedule() {
   const navigate = useNavigate();
   const user = useAppStore((s) => s.user);
-  const userId = user?.user_id || '';
+  const userId = user?.user_id || '1';
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentWeek, setCurrentWeek] = useState(15);
