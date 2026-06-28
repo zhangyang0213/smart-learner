@@ -16,50 +16,6 @@ import { useAppStore } from '@/store';
 import { CardSkeleton, ListSkeleton } from '@/components/Skeleton';
 import type { DashboardOverview, Activity as ActivityType, StudyStats } from '@/types';
 
-// Mock data
-const mockOverview: DashboardOverview = {
-  total_courses: 6,
-  total_documents: 23,
-  total_knowledge_items: 48,
-  active_plans: 2,
-  study_hours_today: 3.5,
-  study_hours_week: 18.5,
-  upcoming_deadlines: [
-    { id: '1', title: '数据结构作业', due_date: '2026-06-18', type: 'assignment', course_name: '数据结构' },
-    { id: '2', title: '操作系统期中考试', due_date: '2026-06-20', type: 'exam', course_name: '操作系统' },
-  ],
-};
-
-const mockStats: StudyStats = {
-  total_hours: 126,
-  daily_average: 3.2,
-  streak_days: 12,
-  subject_distribution: [
-    { subject: '数据结构', hours: 32, percentage: 25 },
-    { subject: '操作系统', hours: 28, percentage: 22 },
-    { subject: '计算机网络', hours: 24, percentage: 19 },
-    { subject: '高等数学', hours: 22, percentage: 18 },
-    { subject: '其他', hours: 20, percentage: 16 },
-  ],
-  weekly_data: [
-    { date: '周一', hours: 2.5 },
-    { date: '周二', hours: 3.0 },
-    { date: '周三', hours: 4.0 },
-    { date: '周四', hours: 2.0 },
-    { date: '周五', hours: 3.5 },
-    { date: '周六', hours: 1.5 },
-    { date: '周日', hours: 2.0 },
-  ],
-  monthly_data: [],
-};
-
-const mockActivities: ActivityType[] = [
-  { id: '1', type: 'course_add', title: '添加课程', description: '添加了课程「计算机网络」', timestamp: '2026-06-17T10:30:00Z' },
-  { id: '2', type: 'document_upload', title: '上传课件', description: '上传了「操作系统-进程管理.pdf」', timestamp: '2026-06-17T09:15:00Z' },
-  { id: '3', type: 'quiz_complete', title: '完成测验', description: '完成了「数据结构」章节测验，得分 85', timestamp: '2026-06-16T16:00:00Z' },
-  { id: '4', type: 'knowledge_add', title: '添加知识', description: '添加了知识条目「TCP三次握手」', timestamp: '2026-06-16T14:20:00Z' },
-  { id: '5', type: 'study_record', title: '学习记录', description: '学习了 2.5 小时「高等数学」', timestamp: '2026-06-15T20:00:00Z' },
-];
 
 const efficiencyScoreDefault = 82;
 
@@ -120,9 +76,9 @@ function formatTimeAgo(timestamp: string): string {
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = useAppStore((s) => s.user);
-  const [overview, setOverview] = useState<DashboardOverview>(mockOverview);
-  const [stats, setStats] = useState<StudyStats>(mockStats);
-  const [activities, setActivities] = useState<ActivityType[]>(mockActivities);
+  const [overview, setOverview] = useState<DashboardOverview>({ total_courses: 0, total_documents: 0, total_knowledge_items: 0, active_plans: 0, study_hours_today: 0, study_hours_week: 0, upcoming_deadlines: [] });
+  const [stats, setStats] = useState<StudyStats>({ total_hours: 0, daily_average: 0, streak_days: 0, subject_distribution: [], weekly_data: [], monthly_data: [] });
+  const [activities, setActivities] = useState<ActivityType[]>([]);
   const [efficiencyScore, setEfficiencyScore] = useState(efficiencyScoreDefault);
   const [loading, setLoading] = useState(true);
 

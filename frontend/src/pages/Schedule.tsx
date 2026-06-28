@@ -5,34 +5,6 @@ import { auth } from '@/services/api';
 import { useAppStore } from '@/store';
 import type { ScheduleItem } from '@/types';
 
-const mockSchedule: ScheduleItem[] = [
-  // Monday
-  { course_name: '编译原理', course_code: '003', teacher: '王晓亮', location: '敬亭学堂321', start_section: 1, end_section: 2, weeks: [12,13,14,15,16], weeks_str: '12~16周', day_of_week: 1 },
-  { course_name: '网络与信息安全技术', course_code: '001', teacher: '顾辰', location: '新安学堂416', start_section: 3, end_section: 4, weeks: [1,2,3,4,5,6], weeks_str: '1~6周', day_of_week: 1 },
-  { course_name: '深度学习', course_code: '001', teacher: '张涛林', location: '新安学堂416', start_section: 5, end_section: 6, weeks: [5,6,7,8], weeks_str: '5~8周', day_of_week: 1 },
-  { course_name: '数据库系统', course_code: '006', teacher: '胡敏', location: '新安学堂316', start_section: 7, end_section: 8, weeks: [9,10,12,13,14,15], weeks_str: '9~10,12~15周', day_of_week: 1 },
-  // Tuesday
-  { course_name: '通用学术英语', course_code: '001', teacher: '张和', location: '新安学堂310', start_section: 3, end_section: 4, weeks: [2,4,5,6,7,9,10,11,12,14,15], weeks_str: '2~4(双),5~7,9~12,14~15周', day_of_week: 2 },
-  { course_name: '计算机组成原理', course_code: '002', teacher: '贾伟', location: '敬亭学堂120', start_section: 5, end_section: 6, weeks: [1,2,3,4,5,6], weeks_str: '1~6周', day_of_week: 2 },
-  { course_name: '软件工程', course_code: '001', teacher: '张弛', location: '新安学堂230', start_section: 7, end_section: 8, weeks: [3,4,5,6,7,8,9,10], weeks_str: '3~10周', day_of_week: 2 },
-  // Wednesday
-  { course_name: '毛泽东思想与中国特色社会主义理论体系概论', course_code: '013', teacher: '朱镕君', location: '敬亭学堂405', start_section: 1, end_section: 2, weeks: [1,2,3,4,5,6,7,8,9,10], weeks_str: '1~10周', day_of_week: 3 },
-  { course_name: '编译原理', course_code: '003', teacher: '程乐超', location: '敬亭学堂323', start_section: 3, end_section: 4, weeks: [7,8,9,10,11], weeks_str: '7~11周', day_of_week: 3 },
-  { course_name: '智能信息处理', course_code: '003', teacher: '刁云峰', location: '敬亭学堂416', start_section: 5, end_section: 6, weeks: [6,7,8], weeks_str: '6~8周', day_of_week: 3 },
-  { course_name: '大学体育（4）', course_code: '042', teacher: '刘茜', location: '风雨操场', start_section: 7, end_section: 8, weeks: [1,2,3,4,5,6,8,9,10,11,12,13,14,15,16,17,18], weeks_str: '1~6,8~18周', day_of_week: 3 },
-  // Thursday
-  { course_name: '数据库系统', course_code: '006', teacher: '胡敏', location: '新安学堂316', start_section: 1, end_section: 2, weeks: [9,10,11,12,13,14,15], weeks_str: '9~15周', day_of_week: 4 },
-  { course_name: '嵌入式人工智能', course_code: '001', teacher: '卫星', location: '新安学堂416', start_section: 5, end_section: 6, weeks: [12,13,14,15], weeks_str: '12~15周', day_of_week: 4 },
-  { course_name: '深度学习', course_code: '001', teacher: '赵志伟', location: '新安学堂416', start_section: 5, end_section: 6, weeks: [1,2,3,4], weeks_str: '1~4周', day_of_week: 4 },
-  { course_name: '计算机组成原理', course_code: '002', teacher: '贾伟', location: '敬亭学堂120', start_section: 7, end_section: 8, weeks: [4], weeks_str: '4周', day_of_week: 4 },
-  // Friday
-  { course_name: '嵌入式人工智能', course_code: '001', teacher: '卫星', location: '敬亭学堂405', start_section: 1, end_section: 2, weeks: [16,17], weeks_str: '16~17周', day_of_week: 5 },
-  { course_name: '大学物理实验（下）', course_code: '015', teacher: '叶英豪', location: '物理实验室', start_section: 3, end_section: 4, weeks: [2,3,4,5,6,7,8,9], weeks_str: '2~9周', day_of_week: 5 },
-  { course_name: '机器学习基础', course_code: '003', teacher: '刘建', location: '敬亭学堂218', start_section: 5, end_section: 6, weeks: [2,3,4,5,6], weeks_str: '2~6周', day_of_week: 5 },
-  { course_name: '就业指导', course_code: '003', teacher: '孙子尧', location: '新安学堂414', start_section: 5, end_section: 6, weeks: [9,10,11,12], weeks_str: '9~12周', day_of_week: 5 },
-  // Saturday
-  { course_name: '大学体育（4）', course_code: '042', teacher: '刘茜', location: '风雨操场', start_section: 7, end_section: 8, weeks: [10], weeks_str: '10周', day_of_week: 6 },
-];
 
 const COLORS = [
   'bg-blue-100 border-blue-400 text-blue-800',
@@ -87,8 +59,7 @@ export default function Schedule() {
           setCurrentWeek(r.current_week);
         }
       } catch {
-        // 使用mock数据作为演示
-        setAllCourses(mockSchedule);
+        setAllCourses([]);
       }
       setLoading(false);
     }

@@ -15,35 +15,11 @@ import { useAppStore } from '@/store';
 import ChatDialog from '@/components/ChatDialog';
 import type { KnowledgeItem, ChatMessage } from '@/types';
 
-const mockCategories = ['计算机科学', '数学', '物理', '英语', '经济学', '心理学'];
-
-const mockItems: KnowledgeItem[] = [
-  {
-    id: '1', title: 'TCP 三次握手与四次挥手', content: 'TCP连接的建立和断开过程...',
-    category: '计算机科学', tags: ['网络', 'TCP', '协议'], source: '计算机网络课程',
-    is_archived: false, created_at: '2026-06-17T10:00:00Z', updated_at: '2026-06-17T10:00:00Z',
-  },
-  {
-    id: '2', title: '进程调度算法对比', content: 'FCFS、SJF、RR等调度算法的特点和适用场景...',
-    category: '计算机科学', tags: ['操作系统', '调度'], source: '操作系统教材',
-    is_archived: false, created_at: '2026-06-16T14:00:00Z', updated_at: '2026-06-16T14:00:00Z',
-  },
-  {
-    id: '3', title: '微积分基本定理', content: '牛顿-莱布尼茨公式将微分和积分联系起来...',
-    category: '数学', tags: ['微积分', '定理'], source: '高等数学笔记',
-    is_archived: false, created_at: '2026-06-15T09:00:00Z', updated_at: '2026-06-15T09:00:00Z',
-  },
-  {
-    id: '4', title: '贝叶斯定理应用', content: '贝叶斯定理在机器学习和统计推断中的应用...',
-    category: '数学', tags: ['概率论', '贝叶斯', '机器学习'], source: '概率论课程',
-    is_archived: false, created_at: '2026-06-14T16:00:00Z', updated_at: '2026-06-14T16:00:00Z',
-  },
-];
 
 export default function Knowledge() {
   const user = useAppStore((s) => s.user);
   const userId = user?.user_id || '1';
-  const [categories, setCategories] = useState<string[]>(mockCategories);
+  const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<KnowledgeItem[]>([]);
@@ -75,7 +51,7 @@ export default function Knowledge() {
         const data = (res as any)?.categories || (res as any)?.data;
         if (Array.isArray(data) && data.length > 0) setCategories(data);
       } catch {
-        // Use mock data
+        // Keep empty state on error
       }
     }
     fetchCategories();
@@ -106,11 +82,10 @@ export default function Knowledge() {
             }))
           );
         } else {
-          // Fallback to mockItems
-          setCategoryItems(mockItems.filter((item) => item.category === selectedCategory));
+          setCategoryItems([]);
         }
       } catch {
-        setCategoryItems(mockItems.filter((item) => item.category === selectedCategory));
+        setCategoryItems([]);
       }
     }
     fetchCategoryItems();
@@ -139,24 +114,10 @@ export default function Knowledge() {
           }))
         );
       } else {
-        // Filter mock data as last resort
-        const filtered = mockItems.filter(
-          (item) =>
-            item.title.includes(searchQuery) ||
-            item.content.includes(searchQuery) ||
-            item.tags.some((t) => t.includes(searchQuery))
-        );
-        setSearchResults(filtered);
+        setSearchResults([]);
       }
     } catch {
-      // Filter mock data as last resort
-      const filtered = mockItems.filter(
-        (item) =>
-          item.title.includes(searchQuery) ||
-          item.content.includes(searchQuery) ||
-          item.tags.some((t) => t.includes(searchQuery))
-      );
-      setSearchResults(filtered);
+      setSearchResults([]);
     }
     setSearching(false);
   };
@@ -276,7 +237,7 @@ export default function Knowledge() {
   };
 
   const getCategoryCount = (cat: string) => {
-    return mockItems.filter((item) => item.category === cat).length;
+    return categoryItems.filter((item) => item.category === cat).length;
   };
 
   return (

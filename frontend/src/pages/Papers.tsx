@@ -19,33 +19,6 @@ import { useAppStore } from '@/store';
 import ChatDialog from '@/components/ChatDialog';
 import type { PaperAnalysis, ChatMessage } from '@/types';
 
-const mockAnalysis: PaperAnalysis = {
-  id: 'mock-1',
-  title: 'Attention Is All You Need',
-  authors: ['Ashish Vaswani', 'Noam Shazeer', 'Niki Parmar'],
-  abstract: 'The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.',
-  key_findings: [
-    '提出了 Transformer 架构，完全基于注意力机制',
-    '在机器翻译任务上达到了 SOTA 性能',
-    '训练效率显著提升，并行化能力更强',
-    '多头注意力机制能有效捕获不同子空间的信息',
-  ],
-  methodology: '基于自注意力机制（Self-Attention）和多头注意力（Multi-Head Attention）构建编码器-解码器架构，使用位置编码替代循环结构，实现完全并行化计算。',
-  contributions: [
-    '提出了全新的 Transformer 架构范式',
-    '证明了注意力机制可以完全替代循环和卷积',
-    '为后续 NLP 领域的预训练模型奠定基础',
-  ],
-  limitations: [
-    '自注意力计算复杂度为 O(n²)，对长序列不友好',
-    '位置编码对序列长度有上限约束',
-    '在小规模数据集上可能不如 CNN/RNN',
-  ],
-  related_topics: ['深度学习', '注意力机制', '自然语言处理', '序列建模', 'Transformer'],
-  published_date: '2017-06-12',
-  venue: 'NeurIPS 2017',
-  created_at: '2026-06-17T00:00:00Z',
-};
 
 type TabKey = 'analysis' | 'qa' | 'related';
 
@@ -85,9 +58,7 @@ export default function Papers() {
         }, 800);
       }
     } catch {
-      // Use mock data on error
-      setAnalysis(mockAnalysis);
-      setDifficulty(4);
+      // Keep analysis as null on error
     }
     setUploading(false);
   }, [userId]);
@@ -128,8 +99,7 @@ export default function Papers() {
         setDifficulty(analysisData.reading_difficulty || Math.floor(Math.random() * 3) + 2);
       }
     } catch {
-      setAnalysis(mockAnalysis);
-      setDifficulty(4);
+      // Keep analysis as null on error
     }
     setUploading(false);
     setPastedText('');

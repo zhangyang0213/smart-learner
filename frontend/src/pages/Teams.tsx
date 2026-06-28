@@ -19,41 +19,6 @@ import { team } from '@/services/api';
 import { useAppStore } from '@/store';
 import type { Team, TeamMember } from '@/types';
 
-const mockTeams: Team[] = [
-  {
-    id: '1', name: '数据结构学习小组', description: '一起复习数据结构，互相讨论算法题',
-    creator_id: 'user-1',
-    members: [
-      { id: 'm1', name: '张三', role: 'owner', joined_at: '2026-03-01T00:00:00Z' },
-      { id: 'm2', name: '李四', role: 'admin', joined_at: '2026-03-02T00:00:00Z' },
-      { id: 'm3', name: '王五', role: 'member', joined_at: '2026-03-05T00:00:00Z' },
-      { id: 'm4', name: '赵六', role: 'member', joined_at: '2026-03-10T00:00:00Z' },
-    ],
-    announcements: [
-      { id: 'a1', title: '本周学习计划', content: '本周重点复习二叉树和图论，周六下午3点线上讨论', author: '张三', created_at: '2026-06-15T10:00:00Z' },
-      { id: 'a2', title: '模拟考试安排', content: '下周三晚上7点进行模拟考试，请大家提前准备', author: '张三', created_at: '2026-06-13T09:00:00Z' },
-    ],
-    todos: [
-      { id: 't1', title: '完成链表专题练习', completed: true, assignee: '李四', due_date: '2026-06-14', created_at: '2026-06-10T00:00:00Z' },
-      { id: 't2', title: '整理树和图笔记', completed: false, assignee: '王五', due_date: '2026-06-18', created_at: '2026-06-12T00:00:00Z' },
-      { id: 't3', title: '刷 LeetCode 动态规划 5 题', completed: false, assignee: '赵六', due_date: '2026-06-20', created_at: '2026-06-14T00:00:00Z' },
-    ],
-    created_at: '2026-03-01T00:00:00Z',
-  },
-  {
-    id: '2', name: '英语角', description: '每日英语口语练习，分享学习资源',
-    creator_id: 'user-2',
-    members: [
-      { id: 'm5', name: '小明', role: 'owner', joined_at: '2026-04-01T00:00:00Z' },
-      { id: 'm6', name: '小红', role: 'member', joined_at: '2026-04-03T00:00:00Z' },
-    ],
-    announcements: [
-      { id: 'a3', title: '每日打卡', content: '每天至少练习15分钟口语，群里打卡分享', author: '小明', created_at: '2026-06-16T08:00:00Z' },
-    ],
-    todos: [],
-    created_at: '2026-04-01T00:00:00Z',
-  },
-];
 
 const roleBadge = (role: TeamMember['role']) => {
   switch (role) {
@@ -69,7 +34,7 @@ const roleBadge = (role: TeamMember['role']) => {
 export default function Teams() {
   const user = useAppStore((s) => s.user);
   const userId = user?.user_id || '1';
-  const [teams, setTeams] = useState<Team[]>(mockTeams);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
 

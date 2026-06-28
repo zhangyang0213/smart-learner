@@ -51,62 +51,6 @@ interface FileRecord {
   error?: string;
 }
 
-// ============ Mock Data ============
-const mockOutline: LessonOutline = {
-  course_name: '数据结构与算法',
-  units: [
-    { name: '算法基础与复杂度分析', difficulty: '入门', knowledge_points: ['时间复杂度', '空间复杂度', '大O表示法', '最好/最坏/平均情况'], prerequisites: [], order: 0, source: '教材第一章' },
-    { name: '线性表：数组与链表', difficulty: '入门', knowledge_points: ['顺序存储', '链式存储', '插入删除', '遍历查找'], prerequisites: ['算法基础与复杂度分析'], order: 1, source: '教材第二章' },
-    { name: '栈与队列', difficulty: '进阶', knowledge_points: ['LIFO/FIFO', '递归与栈', '双端队列', '应用场景'], prerequisites: ['线性表：数组与链表'], order: 2, source: '教材第三章' },
-    { name: '树与二叉树', difficulty: '进阶', knowledge_points: ['二叉树遍历', 'BST', 'AVL树', '堆'], prerequisites: ['栈与队列'], order: 3, source: '教材第四章' },
-    { name: '图论基础', difficulty: '高级', knowledge_points: ['BFS/DFS', '最短路径', '最小生成树', '拓扑排序'], prerequisites: ['树与二叉树'], order: 4, source: '教材第五章' },
-  ],
-};
-
-const mockLessonContent: LessonContent = {
-  title: '算法基础与复杂度分析',
-  objectives: ['理解算法的定义与特性', '掌握大O表示法', '能分析常见算法的时间复杂度', '区分最好、最坏和平均情况'],
-  knowledge_points: ['时间复杂度', '空间复杂度', '大O表示法', '最好/最坏/平均情况'],
-  sections: [
-    { type: 'life_intro', title: '生活引入', content: '想象你在图书馆找一本书。你可以一本一本地翻（线性查找），也可以先看分类标签再定位（二分查找）。两种方法都能找到书，但速度天差地别。算法就是解决问题的"方法"，而复杂度分析就是衡量方法"快不快"的尺子。' },
-    { type: 'course_content', title: '正式讲解', content: '算法是解决特定问题的一系列有限步骤。时间复杂度用大O表示法描述：O(1)常数时间、O(log n)对数时间、O(n)线性时间、O(n log n)线性对数时间、O(n²)平方时间。空间复杂度衡量算法运行过程中所需的额外内存空间。' },
-    { type: 'deep_dive', title: '深挖理解', content: '大O表示法关注的是增长趋势，忽略常数因子和低阶项。例如 3n² + 2n + 1 = O(n²)。最好情况（Best Case）是算法在最有利输入下的表现，最坏情况（Worst Case）是最不利输入下的表现，平均情况（Average Case）是所有可能输入的期望表现。' },
-    { type: 'application', title: '实际应用', content: '1. 排序算法选择：小数据用插入排序O(n²)，大数据用归并排序O(n log n)\n2. 数据库索引：B+树索引使查询从O(n)降到O(log n)\n3. 哈希表查找：平均O(1)，最坏O(n)\n4. 图的遍历：BFS/DFS都是O(V+E)' },
-  ],
-  quick_check: [
-    { question: 'O(n²)和O(n log n)哪个增长更快？', answer_hint: '当n足够大时，n²远大于n log n，所以O(n²)增长更快。' },
-    { question: '二分查找的时间复杂度是多少？为什么？', answer_hint: 'O(log n)，因为每次比较都将搜索范围缩小一半。' },
-  ],
-  feedback_entry: { can_retell: '', stuck_at: '', difficulty: 3, next_step: 'continue' },
-};
-
-const mockQuizQuestions: ExamQuestion[] = [
-  { type: 'single_choice', knowledge_point: '时间复杂度', question: '以下哪个时间复杂度最优？', options: ['O(n²)', 'O(n log n)', 'O(n)', 'O(log n)'], answer: 'D', explanation: 'O(log n)增长最慢，性能最优。', source: '教材第一章' },
-  { type: 'single_choice', knowledge_point: '大O表示法', question: '3n² + 2n + 1 的大O表示是？', options: ['O(3n²)', 'O(n² + n)', 'O(n²)', 'O(6n²)'], answer: 'C', explanation: '大O表示法忽略常数系数和低阶项，3n² + 2n + 1 = O(n²)。', source: '教材第一章' },
-  { type: 'single_choice', knowledge_point: '空间复杂度', question: '以下哪种操作通常需要O(n)的额外空间？', options: ['原地冒泡排序', '归并排序', '二分查找', '快速排序（原地）'], answer: 'B', explanation: '归并排序需要O(n)的辅助数组来合并子数组。', source: '教材第一章' },
-  { type: 'multi_choice', knowledge_point: '复杂度分析', question: '以下哪些算法的平均时间复杂度为O(n log n)？', options: ['快速排序', '归并排序', '冒泡排序', '堆排序'], answer: 'A,B,D', explanation: '快速排序平均O(n log n)，归并排序始终O(n log n)，堆排序O(n log n)，冒泡排序O(n²)。', source: '教材第一章' },
-  { type: 'single_choice', knowledge_point: '最好/最坏情况', question: '线性查找在数组中查找元素，最好情况的时间复杂度是？', options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'], answer: 'A', explanation: '最好情况是第一个元素就是目标，只需一次比较，O(1)。', source: '教材第一章' },
-];
-
-const mockRawText = `=== 第1页 ===
-数据结构与算法
-第一章：算法基础
-
-=== 第2页 ===
-1.1 算法的定义
-算法是解决特定问题的一系列有限步骤
-
-=== 第3页 ===
-1.2 时间复杂度
-大O表示法：O(1), O(log n), O(n), O(n log n), O(n²)
-
-=== 第4页 ===
-1.3 空间复杂度
-衡量算法运行过程中所需的额外内存空间
-
-=== 第5页 ===
-1.4 最好/最坏/平均情况
-Best Case / Worst Case / Average Case`;
 
 // ============ Difficulty Badge ============
 function DifficultyBadge({ difficulty }: { difficulty: string }) {
@@ -264,25 +208,16 @@ export default function Lesson() {
           const texts = data.files
             .filter((f: FileRecord) => f.status === 'parsed')
             .map((f: FileRecord) => `[${f.name}] - 已解析 ${f.chars} 字符`);
-          setRawTexts(texts.length > 0 ? texts : [mockRawText]);
+          setRawTexts(texts);
         }
 
         setTimeout(() => setStep('learning'), 600);
         return;
       }
     } catch {
-      // Fallback to mock
+      // Keep empty state on error
     }
 
-    // Mock fallback
-    setUploadProgress('正在生成课程脉络...');
-    await new Promise(r => setTimeout(r, 800));
-    setUploadProgress('课程准备完成！');
-    setOutline(mockOutline);
-    setLessonCourseId(Date.now());
-    setRawTexts([mockRawText]);
-
-    setTimeout(() => setStep('learning'), 600);
     setUploading(false);
   };
 
@@ -317,28 +252,12 @@ export default function Lesson() {
         return;
       }
     } catch {
-      // Fallback to mock
-    }
-
-    // Mock streaming response
-    const mockResponses: Record<string, string> = {
-      default: '根据课件内容，这是一个很好的问题。数据结构与算法是计算机科学的基础，掌握好复杂度分析对于选择合适的算法至关重要。建议你从大O表示法开始，逐步理解不同复杂度级别的含义和适用场景。',
-    };
-    const answer = question.includes('复杂度')
-      ? '时间复杂度用大O表示法来描述算法的运行时间随输入规模增长的趋势。常见的有：O(1)常数时间、O(log n)对数时间、O(n)线性时间、O(n²)平方时间等。关键是要理解大O关注的是增长趋势，而非精确时间。'
-      : question.includes('排序')
-        ? '常见排序算法的复杂度：冒泡排序O(n²)、快速排序平均O(n log n)、归并排序O(n log n)、堆排序O(n log n)。选择排序算法时，需要考虑数据规模、是否需要稳定性、是否需要原地排序等因素。'
-        : mockResponses.default;
-
-    const words = answer.split('');
-    for (let i = 0; i < words.length; i++) {
-      fullAnswer += words[i];
+      // Show error message on API failure
       setChatMessages(prev => {
         const updated = [...prev];
-        updated[updated.length - 1] = { role: 'assistant', content: fullAnswer };
+        updated[updated.length - 1] = { role: 'assistant', content: '抱歉，暂时无法回答这个问题，请稍后再试。' };
         return updated;
       });
-      await new Promise(r => setTimeout(r, 20));
     }
     setChatStreaming(false);
   };
@@ -361,23 +280,10 @@ export default function Lesson() {
           return;
         }
       }
-    } catch { /* fallback */ }
+    } catch {
+      // Keep empty state on error
+    }
 
-    // Only use mock as last resort, and make it unit-specific
-    const unit = outline?.units[unitIndex];
-    setLessonContent({
-      title: unit?.name || '课程内容',
-      objectives: unit?.knowledge_points || ['理解核心概念'],
-      knowledge_points: unit?.knowledge_points || [],
-      sections: [
-        { type: 'life_intro', title: '生活引入', content: `关于${unit?.name || '本课'}，想象一下你在日常生活中遇到的相关场景...` },
-        { type: 'formal', title: '正式讲解', content: `本节核心知识点：${(unit?.knowledge_points || []).join('、')}。请通过课程对话获取详细讲解。` },
-        { type: 'deep_dive', title: '深挖理解', content: '请通过课程对话深入探讨相关概念。' },
-        { type: 'application', title: '实际应用', content: '请通过课程对话了解实际应用场景。' },
-      ],
-      quick_check: [],
-      feedback_entry: { can_retell: '', stuck_at: '', difficulty: 3, next_step: 'continue' },
-    });
     setLessonLoading(false);
   }, [lessonCourseId, outline]);
 
@@ -399,22 +305,10 @@ export default function Lesson() {
           return;
         }
       }
-    } catch { /* fallback */ }
-
-    // Mock fallback - generate from current unit's knowledge points
-    const unit = outline?.units[currentUnitIndex];
-    if (unit) {
-      const mockQs: ExamQuestion[] = unit.knowledge_points.map((kp) => ({
-        type: 'single_choice' as const,
-        knowledge_point: kp,
-        question: `关于${kp}，以下哪个说法是正确的？`,
-        options: [`${kp}是核心概念`, `${kp}不重要`, `${kp}已被淘汰`, `${kp}仅适用于理论`],
-        answer: 'A',
-        explanation: `${kp}是${unit.name}的核心概念之一。`,
-        source: unit.name,
-      }));
-      setQuizQuestions(mockQs);
+    } catch {
+      // Keep empty state on error
     }
+
     setQuizLoading(false);
   };
 
@@ -447,13 +341,9 @@ export default function Lesson() {
           return;
         }
       }
-    } catch { /* fallback */ }
-    setMastery({
-      mastery_level: feedbackForm.difficulty <= 2 ? '能复述' : feedbackForm.difficulty <= 3 ? '能听懂' : '未接触',
-      analysis: `根据你的反馈，你对本单元内容${feedbackForm.stuck_at ? '在' + feedbackForm.stuck_at + '方面还有困惑' : '有基本了解'}。`,
-      next_action: feedbackForm.difficulty >= 4 ? 'supplement' : 'continue',
-      need_reinforce: feedbackForm.difficulty >= 4,
-    });
+    } catch {
+      // Keep empty state on error
+    }
   };
 
   // ============ Render: Upload Step ============

@@ -17,48 +17,12 @@ import { study } from '@/services/api';
 import { useAppStore } from '@/store';
 import type { StudyPlan, StudyRecord, StudyStats } from '@/types';
 
-const mockPlans: StudyPlan[] = [
-  {
-    id: '1', title: '数据结构期末复习', goal: '掌握所有核心数据结构和算法',
-    subject: '数据结构', start_date: '2026-05-01', end_date: '2026-06-30',
-    phases: [
-      { id: 'p1', title: '基础复习', description: '复习基础数据结构', start_date: '2026-05-01', end_date: '2026-05-15', tasks: ['复习链表', '复习栈和队列'], completed_tasks: 2, total_tasks: 2, status: 'completed' },
-      { id: 'p2', title: '进阶练习', description: '刷题练习', start_date: '2026-05-16', end_date: '2026-06-15', tasks: ['二叉树题目', '图论题目', '动态规划'], completed_tasks: 2, total_tasks: 3, status: 'in_progress' },
-      { id: 'p3', title: '冲刺模拟', description: '模拟考试', start_date: '2026-06-16', end_date: '2026-06-30', tasks: ['模拟卷1', '模拟卷2'], completed_tasks: 0, total_tasks: 2, status: 'pending' },
-    ],
-    status: 'active', progress: 57, created_at: '2026-05-01T00:00:00Z', updated_at: '2026-06-17T00:00:00Z',
-  },
-  {
-    id: '2', title: '英语六级备考', goal: '通过英语六级考试',
-    subject: '英语', start_date: '2026-03-01', end_date: '2026-06-15',
-    phases: [
-      { id: 'p4', title: '词汇积累', description: '背诵六级词汇', start_date: '2026-03-01', end_date: '2026-04-30', tasks: ['词汇书Unit1-10', '词汇书Unit11-20'], completed_tasks: 2, total_tasks: 2, status: 'completed' },
-      { id: 'p5', title: '真题训练', description: '做历年真题', start_date: '2026-05-01', end_date: '2026-06-15', tasks: ['2024年真题', '2025年真题'], completed_tasks: 1, total_tasks: 2, status: 'in_progress' },
-    ],
-    status: 'active', progress: 75, created_at: '2026-03-01T00:00:00Z', updated_at: '2026-06-17T00:00:00Z',
-  },
-];
-
-const mockStats: StudyStats = {
-  total_hours: 126,
-  daily_average: 3.2,
-  streak_days: 12,
-  subject_distribution: [
-    { subject: '数据结构', hours: 32, percentage: 25 },
-    { subject: '英语', hours: 28, percentage: 22 },
-    { subject: '操作系统', hours: 24, percentage: 19 },
-    { subject: '高等数学', hours: 22, percentage: 18 },
-    { subject: '其他', hours: 20, percentage: 16 },
-  ],
-  weekly_data: [],
-  monthly_data: [],
-};
 
 export default function Study() {
   const user = useAppStore((s) => s.user);
   const userId = user?.user_id || '1';
-  const [plans, setPlans] = useState<StudyPlan[]>(mockPlans);
-  const [stats, setStats] = useState<StudyStats>(mockStats);
+  const [plans, setPlans] = useState<StudyPlan[]>([]);
+  const [stats, setStats] = useState<StudyStats>({ total_hours: 0, daily_average: 0, streak_days: 0, subject_distribution: [], weekly_data: [], monthly_data: [] });
   const [loading, setLoading] = useState(true);
 
   // Create plan form
