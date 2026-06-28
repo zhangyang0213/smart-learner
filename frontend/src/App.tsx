@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  BookOpen,
   FileText,
   Brain,
   GraduationCap,
@@ -15,10 +14,9 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/store';
 import ToastContainer from '@/components/Toast';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
-import Courses from '@/pages/Courses';
-import CourseDetail from '@/pages/CourseDetail';
 import Schedule from '@/pages/Schedule';
 import Papers from '@/pages/Papers';
 import Knowledge from '@/pages/Knowledge';
@@ -37,7 +35,6 @@ const navItems: NavItem[] = [
   { path: '/lesson', label: '课程学习', icon: <BookMarked size={20} /> },
   { path: '/schedule', label: '课程表', icon: <Calendar size={20} /> },
   { path: '/dashboard', label: '学习概览', icon: <LayoutDashboard size={20} /> },
-  { path: '/courses', label: '我的课程', icon: <BookOpen size={20} /> },
   { path: '/papers', label: '论文分析', icon: <FileText size={20} /> },
   { path: '/study', label: '学习计划', icon: <GraduationCap size={20} /> },
   { path: '/knowledge', label: '知识库', icon: <Brain size={20} /> },
@@ -191,10 +188,9 @@ function Layout() {
 
         {/* Page Content */}
         <div className="min-h-[calc(100vh-4rem)]">
-          <Routes>
+          <ErrorBoundary>
+            <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/courses" element={<Courses />} />
-            <Route path="/courses/:id" element={<CourseDetail />} />
             <Route path="/papers" element={<Papers />} />
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/study" element={<Study />} />
@@ -204,6 +200,7 @@ function Layout() {
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/" element={<Navigate to="/lesson" replace />} />
           </Routes>
+          </ErrorBoundary>
         </div>
       </main>
     </div>

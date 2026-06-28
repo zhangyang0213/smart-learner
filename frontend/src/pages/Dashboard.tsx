@@ -176,9 +176,9 @@ export default function Dashboard() {
             total_hours: statsData.total_hours ?? 0,
             daily_average: statsData.daily_average ?? 0,
             streak_days: statsData.streak_days ?? 0,
-            subject_distribution: statsData.subject_distribution ?? [],
-            weekly_data: statsData.weekly_data ?? [],
-            monthly_data: statsData.monthly_data ?? [],
+            subject_distribution: Array.isArray(statsData.subject_distribution) ? statsData.subject_distribution : [],
+            weekly_data: Array.isArray(statsData.weekly_data) ? statsData.weekly_data : [],
+            monthly_data: Array.isArray(statsData.monthly_data) ? statsData.monthly_data : [],
           });
           if (sd.efficiency_score !== undefined) {
             setEfficiencyScore(Number(sd.efficiency_score) || 0);
@@ -199,7 +199,7 @@ export default function Dashboard() {
     { label: '效率评分', value: efficiencyScore, icon: <Zap className="w-5 h-5" />, color: 'bg-violet-500' },
   ];
 
-  const maxWeeklyHours = Math.max(...stats.weekly_data.map((d) => d.hours), 1);
+  const maxWeeklyHours = Math.max(...(Array.isArray(stats.weekly_data) ? stats.weekly_data : []).map((d) => d.hours), 1);
 
   if (loading) {
     return (

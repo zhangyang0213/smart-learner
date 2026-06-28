@@ -68,7 +68,8 @@ export default function Schedule() {
   const userId = user?.user_id || '1';
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentWeek, setCurrentWeek] = useState(15);
+  const [currentWeek, setCurrentWeek] = useState(1);
+  const [scheduleMessage, setScheduleMessage] = useState('');
 
   useEffect(() => {
     async function fetchSchedule() {
@@ -77,30 +78,44 @@ export default function Schedule() {
         // Backend returns {schedule, current_week, ...}, not {success, data}
         const r = res as any;
         const scheduleData = r?.schedule || r?.data?.schedule;
-        if (Array.isArray(scheduleData)) {
+        if (r?.message) setScheduleMessage(r.message);
+        if (Array.isArray(scheduleData) && scheduleData.length > 0) {
           setSchedule(scheduleData);
-          if (r?.target_week) {
-            setCurrentWeek(r.target_week);
-          } else if (r?.current_week) {
-            setCurrentWeek(r.current_week);
-          }
-          setLoading(false);
-          return;
+        } else if (Array.isArray(scheduleData) && scheduleData.length === 0) {
+          // 后端返回空数组 - 可能没有该周课程或未上传课表
+          setSchedule([]);
+        }
+        if (r?.current_week) {
+          setCurrentWeek(r.current_week);
         }
       } catch {
-        // Use mock data
+        setSchedule([]);
       }
-      setSchedule(mockSchedule);
       setLoading(false);
     }
     fetchSchedule();
-  }, [userId, currentWeek]);
+  }, [userId]);
 
-  // Filter schedule for current week
-  const filteredSchedule = useMemo(
-    () => schedule.filter((item) => item.weeks.includes(currentWeek)),
-    [schedule, currentWeek]
-  );
+  // 切换周次时重新请求
+  useEffect(() => {
+    async function refetchSchedule() {
+      try {
+        const res = await auth.getSchedule(userId, currentWeek);
+        const r = res as any;
+        const scheduleData = r?.schedule || r?.data?.schedule;
+        if (Array.isArray(scheduleData)) {
+          setSchedule(scheduleData);
+        }
+      } catch {
+        // Keep existing schedule
+      }
+    }
+    // 只在初始加载完成后才允许切换周次时请求
+    if (!loading) refetchSchedule();
+  }, [currentWeek]);
+
+  // 后端已经按week过滤，直接使用schedule
+  const filteredSchedule = schedule;
 
   // Build color map by course name
   const colorMap = useMemo(() => {
@@ -133,7 +148,7 @@ export default function Schedule() {
         <div className="card flex flex-col items-center justify-center py-16">
           <p className="text-warm-500 mb-4">请先上传课表</p>
           <button
-            onClick={() => navigate('/lesson')}
+            onClick={() => navigate('/login')}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-navy-600 text-white font-medium hover:bg-navy-500 transition-colors"
           >
             <Upload className="w-4 h-4" />
