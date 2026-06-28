@@ -37,7 +37,8 @@ async def analyze_paper(
         raise HTTPException(status_code=400, detail="请提供论文文本或上传文件")
 
     analysis = await llm_service.analyze_paper(paper_text)
-    return {"analysis": analysis}
+    # 返回论文原文（截断）供前端问答使用
+    return {"analysis": analysis, "paper_text": paper_text[:8000]}
 
 
 @router.post("/summarize")

@@ -92,11 +92,11 @@ export default function Login() {
       // Silently continue even if upload fails
     }
     setLoading(false);
-    navigate('/lesson');
+    navigate('/schedule');
   };
 
   const handleSkip = () => {
-    navigate('/lesson');
+    navigate('/schedule');
   };
 
   return (

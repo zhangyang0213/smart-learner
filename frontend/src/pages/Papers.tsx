@@ -59,6 +59,7 @@ export default function Papers() {
   const [pastedText, setPastedText] = useState('');
   const [difficulty, setDifficulty] = useState(0);
   const [analyzingDifficulty, setAnalyzingDifficulty] = useState(false);
+  const [paperText, setPaperText] = useState(''); // 保存论文原文用于问答
 
   // QA state
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
@@ -72,9 +73,11 @@ export default function Papers() {
     setUploading(true);
     try {
       const res = await paper.analyzePaper(file, userId);
-      const analysisData = (res as any)?.analysis || (res as any)?.data || res;
+      const r = res as any;
+      const analysisData = r?.analysis || r?.data || res;
       if (analysisData) {
         setAnalysis(analysisData);
+        setPaperText(r?.paper_text || ''); // 保存论文原文
         setAnalyzingDifficulty(true);
         setTimeout(() => {
           setDifficulty(analysisData.reading_difficulty || Math.floor(Math.random() * 3) + 3);
@@ -117,9 +120,11 @@ export default function Papers() {
       const blob = new Blob([pastedText], { type: 'text/plain' });
       const file = new File([blob], 'pasted-text.txt', { type: 'text/plain' });
       const res = await paper.analyzePaper(file, userId);
-      const analysisData = (res as any)?.analysis || (res as any)?.data || res;
+      const r = res as any;
+      const analysisData = r?.analysis || r?.data || res;
       if (analysisData) {
         setAnalysis(analysisData);
+        setPaperText(r?.paper_text || ''); // 保存论文原文
         setDifficulty(analysisData.reading_difficulty || Math.floor(Math.random() * 3) + 2);
       }
     } catch {
@@ -142,7 +147,7 @@ export default function Papers() {
     setQaMessages((prev) => [...prev, userMsg]);
     setQaLoading(true);
     try {
-      const res = await paper.paperQA(analysis.id || '1', question, userId);
+      const res = await paper.paperQA(question, paperText);
       const answer = (res as any)?.answer || (res as any)?.data?.content || '分析完成，但无法获取详细回答。';
       const assistantMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
@@ -169,7 +174,7 @@ export default function Papers() {
     if (!analysis) return;
     setRelatedLoading(true);
     try {
-      const res = await paper.suggestRelated(analysis.id || '1', userId);
+      const res = await paper.suggestRelated(paperText);
       // Backend returns {related_topics, search_keywords, suggested_directions} or {raw_suggestion}
       const r = res as any;
       const directions = r?.suggested_directions || r?.data?.suggested_directions;

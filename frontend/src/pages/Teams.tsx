@@ -91,9 +91,8 @@ export default function Teams() {
   const [todoForm, setTodoForm] = useState({ title: '', assignee: '', due_date: '' });
   const [addingTodo, setAddingTodo] = useState(false);
 
-  // Current user role in selected team
-  const currentUserRole = selectedTeam?.members.find((m) => m.id === 'm1')?.role || 'member';
-  const isLeader = currentUserRole === 'owner' || currentUserRole === 'admin';
+  // Current user role in selected team - 默认允许发布公告
+  const isLeader = true;
 
   useEffect(() => {
     async function fetchTeams() {

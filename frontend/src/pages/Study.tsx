@@ -112,9 +112,9 @@ export default function Study() {
             total_hours: statsData.total_hours ?? 0,
             daily_average: statsData.daily_average ?? 0,
             streak_days: statsData.streak_days ?? 0,
-            subject_distribution: statsData.subject_distribution ?? [],
-            weekly_data: statsData.weekly_data ?? [],
-            monthly_data: statsData.monthly_data ?? [],
+            subject_distribution: Array.isArray(statsData.subject_distribution) ? statsData.subject_distribution : [],
+            weekly_data: Array.isArray(statsData.weekly_data) ? statsData.weekly_data : [],
+            monthly_data: Array.isArray(statsData.monthly_data) ? statsData.monthly_data : [],
           });
         }
       } catch {
@@ -232,7 +232,7 @@ export default function Study() {
     }
   };
 
-  const topSubject = stats.subject_distribution.length > 0 ? stats.subject_distribution[0].subject : '-';
+  const topSubject = Array.isArray(stats.subject_distribution) && stats.subject_distribution.length > 0 ? stats.subject_distribution[0].subject : '-';
 
   if (loading) {
     return (
@@ -333,7 +333,7 @@ export default function Study() {
                     </div>
 
                     {/* Milestone dots */}
-                    {plan.phases.length > 0 && (
+                    {(Array.isArray(plan.phases) && plan.phases.length > 0) && (
                       <div className="flex items-center gap-1 mb-3">
                         {plan.phases.map((phase) => (
                           <div key={phase.id} className="flex items-center gap-1 flex-1">
@@ -476,7 +476,7 @@ export default function Study() {
             <h2 className="section-title">学科分布</h2>
             <div className="card">
               <div className="space-y-3">
-                {stats.subject_distribution.map((item) => (
+                {(Array.isArray(stats.subject_distribution) ? stats.subject_distribution : []).map((item) => (
                   <div key={item.subject}>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="text-warm-700">{item.subject}</span>

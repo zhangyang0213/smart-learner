@@ -547,14 +547,41 @@ function QuizTab({ courseId }: { courseId: string }) {
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const user = useAppStore((s) => s.user);
+  const userId = user?.user_id || '1';
   const [course, setCourse] = useState<Course>(mockCourse);
   const [activeTab, setActiveTab] = useState<TabKey>('qa');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // No backend endpoint for getting a single course; use mock data
-    setLoading(false);
-  }, [id]);
+    async function fetchCourse() {
+      try {
+        const res = await courseApi.listCourses(userId);
+        const data = (res as any)?.courses || (res as any)?.data || res;
+        const coursesList = Array.isArray(data) ? data : (data?.courses && Array.isArray(data.courses) ? data.courses : null);
+        if (coursesList) {
+          const found = coursesList.find((c: any) => String(c.id) === id);
+          if (found) {
+            setCourse({
+              id: String(found.id ?? ''),
+              name: found.name ?? '',
+              code: found.code ?? '',
+              teacher: found.teacher ?? '',
+              semester: found.semester ?? '',
+              description: found.description ?? found.schedule ?? '',
+              documents: found.documents ?? [],
+              created_at: found.created_at ?? new Date().toISOString(),
+              updated_at: found.updated_at ?? new Date().toISOString(),
+            });
+          }
+        }
+      } catch {
+        // Use mock data
+      }
+      setLoading(false);
+    }
+    fetchCourse();
+  }, [id, userId]);
 
   const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: 'qa', label: '课程问答', icon: <MessageSquare className="w-4 h-4" /> },

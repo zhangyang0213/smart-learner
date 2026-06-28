@@ -291,15 +291,15 @@ export const paper = {
       max_length,
     }),
 
-  paperQA: (paperId: string, question: string, userId?: string) =>
+  paperQA: (question: string, paperText: string) =>
     formRequest<any>('/api/paper/qa', {
       question,
-      paper_text: question, // 后端需要paper_text，这里用question作为临时方案
+      paper_text: paperText,
     }),
 
-  suggestRelated: (paperId: string, userId?: string) =>
+  suggestRelated: (paperText: string) =>
     formRequest<any>('/api/paper/suggest-related', {
-      paper_text: paperId, // 后端需要paper_text
+      paper_text: paperText,
     }),
 };
 

@@ -49,6 +49,7 @@ export default function Knowledge() {
   const [searchResults, setSearchResults] = useState<KnowledgeItem[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [categoryItems, setCategoryItems] = useState<KnowledgeItem[]>([]); // 分类下的条目
 
   // Add knowledge modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -79,6 +80,41 @@ export default function Knowledge() {
     }
     fetchCategories();
   }, [userId]);
+
+  // 选中分类时获取该分类下的条目
+  useEffect(() => {
+    async function fetchCategoryItems() {
+      if (!selectedCategory) {
+        setCategoryItems([]);
+        return;
+      }
+      try {
+        const res = await knowledge.searchKnowledge('', userId, selectedCategory);
+        const data = (res as any)?.results || (res as any)?.data;
+        if (Array.isArray(data)) {
+          setCategoryItems(
+            data.map((item: any, idx: number) => ({
+              id: String(item.id ?? idx),
+              title: item.title ?? '',
+              content: item.content ?? '',
+              category: item.category ?? selectedCategory,
+              tags: Array.isArray(item.tags) ? item.tags : [],
+              source: item.source,
+              is_archived: false,
+              created_at: item.created_at ?? new Date().toISOString(),
+              updated_at: item.created_at ?? new Date().toISOString(),
+            }))
+          );
+        } else {
+          // Fallback to mockItems
+          setCategoryItems(mockItems.filter((item) => item.category === selectedCategory));
+        }
+      } catch {
+        setCategoryItems(mockItems.filter((item) => item.category === selectedCategory));
+      }
+    }
+    fetchCategoryItems();
+  }, [selectedCategory, userId]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -371,7 +407,7 @@ export default function Knowledge() {
           </div>
 
           {/* Search Results */}
-          {!hasSearched ? (
+          {!hasSearched && !selectedCategory ? (
             <div className="card text-center py-16">
               <Brain className="w-12 h-12 text-warm-300 mx-auto mb-4" />
               <p className="text-warm-500">输入关键词或自然语言搜索你的知识库</p>
@@ -380,16 +416,17 @@ export default function Knowledge() {
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-8 h-8 text-navy-600 animate-spin" />
             </div>
-          ) : searchResults.length === 0 ? (
+          ) : (hasSearched && searchResults.length === 0) || (!hasSearched && selectedCategory && categoryItems.length === 0) ? (
             <div className="card text-center py-16">
               <Search className="w-12 h-12 text-warm-300 mx-auto mb-4" />
               <p className="text-warm-500">未找到相关结果，试试其他关键词</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {searchResults
-                .filter((item) => !selectedCategory || item.category === selectedCategory)
-                .map((item) => (
+              {(hasSearched
+                ? searchResults.filter((item) => !selectedCategory || item.category === selectedCategory)
+                : categoryItems
+              ).map((item) => (
                   <div key={item.id} className="card card-hover">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
