@@ -43,9 +43,12 @@ class ScheduleParser:
         # 按逗号分割
         parts = clean.split(',')
         for part in parts:
-            part = part.strip()
-            if '~' in part:
-                start, end = part.split('~')
+            part = part.strip().replace('周', '')  # 去掉"周"字
+            if not part:
+                continue
+            if '~' in part or '～' in part:
+                sep = '~' if '~' in part else '～'
+                start, end = part.split(sep)
                 start, end = int(start.strip()), int(end.strip())
                 for w in range(start, end + 1):
                     result.append(w)

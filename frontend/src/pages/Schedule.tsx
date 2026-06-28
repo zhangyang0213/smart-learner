@@ -66,66 +66,50 @@ export default function Schedule() {
   const navigate = useNavigate();
   const user = useAppStore((s) => s.user);
   const userId = user?.user_id || '1';
-  const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+  const [allCourses, setAllCourses] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [scheduleMessage, setScheduleMessage] = useState('');
 
+  // 一次性获取所有课程数据
   useEffect(() => {
     async function fetchSchedule() {
       try {
-        const res = await auth.getSchedule(userId, currentWeek);
-        // Backend returns {schedule, current_week, ...}, not {success, data}
+        const res = await auth.getSchedule(userId, 1);
         const r = res as any;
-        const scheduleData = r?.schedule || r?.data?.schedule;
         if (r?.message) setScheduleMessage(r.message);
-        if (Array.isArray(scheduleData) && scheduleData.length > 0) {
-          setSchedule(scheduleData);
-        } else if (Array.isArray(scheduleData) && scheduleData.length === 0) {
-          // 后端返回空数组 - 可能没有该周课程或未上传课表
-          setSchedule([]);
+        // 优先使用all_courses（包含所有周次的课程），这样前端可以自由过滤
+        const allData = r?.all_courses || r?.schedule || r?.data?.schedule;
+        if (Array.isArray(allData) && allData.length > 0) {
+          setAllCourses(allData);
         }
         if (r?.current_week) {
           setCurrentWeek(r.current_week);
         }
       } catch {
-        setSchedule([]);
+        // 使用mock数据作为演示
+        setAllCourses(mockSchedule);
       }
       setLoading(false);
     }
     fetchSchedule();
   }, [userId]);
 
-  // 切换周次时重新请求
-  useEffect(() => {
-    async function refetchSchedule() {
-      try {
-        const res = await auth.getSchedule(userId, currentWeek);
-        const r = res as any;
-        const scheduleData = r?.schedule || r?.data?.schedule;
-        if (Array.isArray(scheduleData)) {
-          setSchedule(scheduleData);
-        }
-      } catch {
-        // Keep existing schedule
-      }
-    }
-    // 只在初始加载完成后才允许切换周次时请求
-    if (!loading) refetchSchedule();
-  }, [currentWeek]);
-
-  // 后端已经按week过滤，直接使用schedule
-  const filteredSchedule = schedule;
+  // 在前端过滤当前周次的课程
+  const filteredSchedule = useMemo(
+    () => allCourses.filter((item) => item.weeks && item.weeks.includes(currentWeek)),
+    [allCourses, currentWeek]
+  );
 
   // Build color map by course name
   const colorMap = useMemo(() => {
     const map = new Map<string, string>();
-    const allNames = Array.from(new Set(schedule.map((s) => s.course_name)));
+    const allNames = Array.from(new Set(allCourses.map((s) => s.course_name)));
     allNames.forEach((name) => {
       map.set(name, getCourseColor(name));
     });
     return map;
-  }, [schedule]);
+  }, [allCourses]);
 
   // Get current day of week (1=Monday, 7=Sunday)
   const today = new Date().getDay();
@@ -141,7 +125,7 @@ export default function Schedule() {
     );
   }
 
-  if (schedule.length === 0) {
+  if (allCourses.length === 0) {
     return (
       <div className="page-container">
         <h1 className="text-2xl font-bold text-warm-800 mb-6">课程表</h1>

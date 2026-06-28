@@ -19,12 +19,23 @@ class FileParser:
 
     @staticmethod
     async def parse_docx(file_path: str) -> str:
-        """解析DOCX文件"""
+        """解析DOCX文件，包含段落和表格"""
         doc = Document(file_path)
         texts = []
+        # 提取段落
         for paragraph in doc.paragraphs:
             if paragraph.text.strip():
                 texts.append(paragraph.text)
+        # 提取表格
+        for table in doc.tables:
+            for row in table.rows:
+                row_texts = []
+                for cell in row.cells:
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        row_texts.append(cell_text)
+                if row_texts:
+                    texts.append(" | ".join(row_texts))
         return "\n\n".join(texts)
 
     @staticmethod
